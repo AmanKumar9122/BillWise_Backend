@@ -4,11 +4,13 @@ package com.aksps.BillWise.repository;
 import com.aksps.BillWise.model.Role;
 import com.aksps.BillWise.model.RoleName;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.stereotype.Repository;
 
 import java.util.Optional;
 
 // why extending JpaRepository?
 // JpaRepository provides CRUD operations and pagination for the Role entity
+@Repository
 public interface RoleRepository extends JpaRepository<Role, Long> {
 
     // why Optional?
