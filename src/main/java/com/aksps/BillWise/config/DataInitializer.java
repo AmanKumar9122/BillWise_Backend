@@ -3,11 +3,11 @@ package com.aksps.BillWise.config;
 import com.aksps.BillWise.model.Role;
 import com.aksps.BillWise.model.RoleName;
 import com.aksps.BillWise.repository.RoleRepository;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import org.springframework.boot.CommandLineRunner;
-import org.springframework.context.annotation.Bean;
-import org.springframework.context.annotation.Configuration;
+import org.slf4j.Logger; // Simple Logging Facade for Java
+import org.slf4j.LoggerFactory; // Factory for creating Logger instances
+import org.springframework.boot.CommandLineRunner; // Interface used to run code at application startup
+import org.springframework.context.annotation.Bean; // Annotation to declare a bean
+import org.springframework.context.annotation.Configuration; // Indicates that the class contains bean definitions
 
 import java.util.Arrays;
 import java.util.List;
@@ -16,6 +16,10 @@ import java.util.List;
 public class DataInitializer {
 
     // Logger for logging information during initialization
+    // LoggerFactory is used to create a logger instance for this class
+
+    // why using static final?
+    // static final ensures that there is only one instance of the logger for this class
     private static final Logger logger = LoggerFactory.getLogger(DataInitializer.class);
 
     @Bean // bean to run code at application startup
@@ -25,6 +29,7 @@ public class DataInitializer {
 
         // Lambda expression implementing CommandLineRunner
         return args -> {
+            // List of required roles to be initialized
             List<RoleName> requiredRoles = Arrays.asList(
                     RoleName.ROLE_USER,
                     RoleName.ROLE_MANAGER,
