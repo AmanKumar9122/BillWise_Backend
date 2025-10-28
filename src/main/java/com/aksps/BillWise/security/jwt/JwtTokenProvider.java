@@ -1,4 +1,4 @@
-package com.aksps.BillWise.security;
+package com.aksps.BillWise.security.jwt;
 
 import io.jsonwebtoken.*;
 import org.slf4j.Logger;
