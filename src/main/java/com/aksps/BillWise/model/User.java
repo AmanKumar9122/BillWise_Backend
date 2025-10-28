@@ -28,15 +28,23 @@ public class User {
     @Column(nullable = false)
     private String password; // Stored as hashed value (BCrypt)
 
+    // Eager fetching to load roles along with user
     @ManyToMany(fetch = FetchType.EAGER,cascade = CascadeType.ALL)
+    // Why here we are using many to many ?
+    // because one user can have multiple roles and one role can be assigned to multiple users
+
     @JoinTable(
         name = "user_roles",
         joinColumns = @JoinColumn(name = "user_id"),
         inverseJoinColumns = @JoinColumn(name = "role_id")
     )
+
+    // why set ? - to avoid duplicate roles for a user
     private Set<Role> roles = new HashSet<>();
 
     // Constructor used for registering new users
+    // Why not including id and roles in constructor ?
+    // id is auto-generated and roles can be assigned later
 
     public User(String username ,String email , String password) {
         this.username = username;
