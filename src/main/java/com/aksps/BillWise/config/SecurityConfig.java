@@ -22,42 +22,47 @@ import org.springframework.security.web.authentication.UsernamePasswordAuthentic
 @EnableMethodSecurity(securedEnabled = true, jsr250Enabled = true)
 public class SecurityConfig {
 
+    // Injecting CustomUserDetailsService to load user-specific data
     private final CustomUserDetailsService userDetailsService;
 
     public SecurityConfig(CustomUserDetailsService userDetailsService) {
         this.userDetailsService = userDetailsService;
     }
-
+    // Bean definition for JwtAuthFilter
     @Bean
     public JwtAuthFilter jwtAuthFilter() {
         return new JwtAuthFilter();
     }
 
+    // Bean definition for PasswordEncoder using BCrypt
     @Bean
     public PasswordEncoder passwordEncoder() {
         return new BCryptPasswordEncoder();
     }
 
+    // Bean definition for AuthenticationProvider using DaoAuthenticationProvider
     @Bean
     public AuthenticationProvider authenticationProvider() {
-        DaoAuthenticationProvider authProvider = new DaoAuthenticationProvider();
-        authProvider.setUserDetailsService(userDetailsService);
-        authProvider.setPasswordEncoder(passwordEncoder());
-        return authProvider;
+        DaoAuthenticationProvider authProvider = new DaoAuthenticationProvider(); // Using DAO-based authentication
+        authProvider.setUserDetailsService(userDetailsService);                   // Setting the custom user details service
+        authProvider.setPasswordEncoder(passwordEncoder());                       // Setting the password encoder
+        return authProvider;                                                      // Returning the configured authentication provider
     }
 
+    // Bean definition for AuthenticationManager
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
         http
-                .csrf(AbstractHttpConfigurer::disable)
-                .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+                .csrf(AbstractHttpConfigurer::disable) // Disabling CSRF protection for stateless APIs
+                .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS)) // Setting session management to stateless
+                // Configuring authorization rules
                 .authorizeHttpRequests(auth -> auth
-                        .requestMatchers("/api/auth/**", "/swagger-ui/**", "/v3/api-docs/**", "/actuator/**").permitAll()
-                        .anyRequest().authenticated()
+                        .requestMatchers("/api/auth/**", "/swagger-ui/**", "/v3/api-docs/**", "/actuator/**").permitAll() // Public endpoints
+                        .anyRequest().authenticated() // All other endpoints require authentication
                 )
-                .authenticationProvider(authenticationProvider())
-                .addFilterBefore(jwtAuthFilter(), UsernamePasswordAuthenticationFilter.class);
+                .authenticationProvider(authenticationProvider()) // Setting the authentication provider
+                .addFilterBefore(jwtAuthFilter(), UsernamePasswordAuthenticationFilter.class); // Adding JWT authentication filter before the username-password filter
 
-        return http.build();
+        return http.build(); // Building and returning the security filter chain
     }
 }
