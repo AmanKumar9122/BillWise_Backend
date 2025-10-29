@@ -1,6 +1,9 @@
 package com.aksps.BillWise.security.jwt;
 
 import io.jsonwebtoken.*;
+import io.jsonwebtoken.io.Decoders;
+import io.jsonwebtoken.security.Keys;
+import io.jsonwebtoken.security.SignatureException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -8,93 +11,99 @@ import org.springframework.security.core.Authentication;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.stereotype.Component;
 
+import jakarta.annotation.PostConstruct; // New Import
+import java.security.Key;
 import java.util.Date;
 
 /**
- * Utility class for generating, parsing, and validating JWT tokens.
+ * Utility class for generating, validating, and extracting user information from JWT tokens.
+ * Uses @PostConstruct to safely initialize the secret key after @Value fields are populated.
  */
 @Component
 public class JwtTokenProvider {
 
-    // Logger for logging JWT-related information
     private static final Logger logger = LoggerFactory.getLogger(JwtTokenProvider.class);
 
-    // JWT secret key and expiration time are injected from application properties
+    // Fields injected by Spring
     @Value("${jwt.secret}")
     private String jwtSecret;
+
     @Value("${jwt.expiration}")
-    private int jwtExpirationInMs;
+    private int jwtExpirationMs;
+
+    // Fields initialized after Spring injection (in @PostConstruct)
+    private Key key;
+    private JwtParser jwtParser;
+
+    // Constructor is simplified and no longer tries to initialize the key prematurely
+    public JwtTokenProvider() {
+        // Empty constructor, Spring handles property injection
+    }
 
     /**
-     * Generates a JWT token for the authenticated user.
+     * Executes immediately after the bean is constructed and all @Value fields are set.
+     * This guarantees the 'jwtSecret' is available before we try to use it.
+     */
+    @PostConstruct
+    public void init() {
+        if (jwtSecret == null || jwtSecret.trim().isEmpty()) {
+            throw new IllegalArgumentException("JWT Secret key must be configured (app.jwtSecret) and cannot be empty.");
+        }
+
+        // 1. Initialize the Key (Fixes WeakKeyException)
+        this.key = Keys.hmacShaKeyFor(Decoders.BASE64.decode(jwtSecret));
+
+        // 2. Initialize the Parser (Fixes parserBuilder() compilation error)
+        this.jwtParser = Jwts.parser()
+                .setSigningKey(this.key)
+                .build();
+    }
+
+
+    /**
+     * Generates a JWT based on the authenticated user's details.
      */
     public String generateToken(Authentication authentication) {
-
-        // Get the user details from the authentication object
         UserDetails userPrincipal = (UserDetails) authentication.getPrincipal();
 
-        // Set token issue and expiration dates
         Date now = new Date();
-        Date expiryDate = new Date(now.getTime() + jwtExpirationInMs);
+        Date expiryDate = new Date(now.getTime() + jwtExpirationMs);
 
-        // Build and return the JWT token
         return Jwts.builder()
-                .setSubject(userPrincipal.getUsername())            // Set the subject as the username
-                .setIssuedAt(now)                                   // Set the issue date
-                .setExpiration(expiryDate)                          // Set the expiration date
-                .signWith(SignatureAlgorithm.HS512, jwtSecret)      // Sign the token with the secret key
-                .compact();                                         // Build the token
+                .setSubject(userPrincipal.getUsername())
+                .setIssuedAt(new Date())
+                .setExpiration(expiryDate)
+                .signWith(key, SignatureAlgorithm.HS512)
+                .compact();
     }
 
     /**
-     * Extracts the username from a JWT token.
+     * Extracts the username from a JWT.
      */
     public String getUsernameFromJWT(String token) {
-        Claims claims = Jwts.parser()
-                .setSigningKey(jwtSecret)
-                .build()
-                .parseClaimsJws(token)
-                .getBody();
-        return claims.getSubject();
+        // Use the pre-initialized parser field directly
+        return jwtParser.parseClaimsJws(token)
+                .getBody().getSubject();
     }
 
     /**
-     * Validates a JWT token.
+     * Validates the integrity and expiration of a JWT.
      */
     public boolean validateToken(String authToken) {
-        // Try to parse the token to validate it
         try {
-            // If parsing is successful, the token is valid
-            Jwts.parser()                                       // Create a new JwtParser instance
-                    .setSigningKey(jwtSecret)                   // Set the secret key used for signature validation
-                    .build()                                    // Build the JwtParser
-                    .parseClaimsJws(authToken);                 // Parse the JWT token
+            // Use the pre-initialized parser field directly
+            jwtParser.parseClaimsJws(authToken);
             return true;
-        }
-        // What is SignatureException ?
-        // It is thrown when the JWT signature does not match locally computed signature
-        catch (SignatureException e) {
-            logger.error("Invalid JWT signature: {}", e.getMessage());
-        }
-        // What is MalformedJwtException ?
-        // It is thrown when the JWT was not correctly constructed
-        catch (MalformedJwtException e) {
-            logger.error("Invalid JWT token: {}", e.getMessage());
-        }
-        // What is ExpiredJwtException ?
-        // It is thrown when the JWT has expired
-        catch (ExpiredJwtException e) {
-            logger.error("Expired JWT token: {}", e.getMessage());
-        }
-        // What is UnsupportedJwtException ?
-        // It is thrown when the JWT is of a type that is not supported
-        catch (UnsupportedJwtException e) {
-            logger.error("Unsupported JWT token: {}", e.getMessage());
-        }
-        // What is IllegalArgumentException ?
-        // It is thrown when the claims string is empty or only whitespace
-        catch (IllegalArgumentException e) {
-            logger.error("JWT claims string is empty: {}", e.getMessage());
+        } catch (SignatureException ex) {
+            logger.error("Invalid JWT signature");
+        } catch (MalformedJwtException ex) {
+            logger.error("Invalid JWT token");
+        } catch (ExpiredJwtException ex) {
+            logger.error("Expired JWT token");
+        } catch (UnsupportedJwtException ex) {
+            logger.error("Unsupported JWT token");
+        } catch (IllegalArgumentException ex) {
+            logger.error("JWT claims string is empty.");
         }
         return false;
     }
