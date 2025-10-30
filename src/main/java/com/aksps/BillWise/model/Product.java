@@ -29,7 +29,7 @@ public class Product {
     private Integer currentStock;
     private Integer minStockLevel;
 
-    public Product(String name, String sku, Double sellingPricePerBaseUnit, UnitType unitType, Double baseUnit, Integer currentStock, Integer minStockLevel) {
+    public Product(String name, String sku, Double sellingPricePerBaseUnit, UnitType unitType, String baseUnit, Integer currentStock, Integer minStockLevel) {
         this.name = name;
         this.sku = sku;
         this.sellingPricePerBaseUnit = sellingPricePerBaseUnit;
