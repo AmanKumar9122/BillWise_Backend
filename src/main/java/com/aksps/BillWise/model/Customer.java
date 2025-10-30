@@ -17,6 +17,8 @@ public class Customer {
     private Long id;
 
     private String name;
+
+    @Column(unique = true)
     private String contactNumber;
     private String email;
 
