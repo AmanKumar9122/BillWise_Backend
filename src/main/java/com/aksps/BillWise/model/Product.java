@@ -24,7 +24,7 @@ public class Product {
     @Enumerated(EnumType.STRING)
     private UnitType unitType;
 
-    private Double baseUnit;
+    private String baseUnit;
 
     private Integer currentStock;
     private Integer minStockLevel;
