@@ -195,4 +195,15 @@ public class InvoiceService {
                 invoice.getGrandTotal()
         );
     }
+    public InvoiceResponse getInvoiceResponseById(Long id) {
+        Invoice invoice = invoiceRepository.findById(id)
+                .orElseThrow(() -> new IllegalArgumentException("Invoice not found with ID: " + id));
+
+        // Ensure items are loaded before mapping (optional, for safety)
+        if (invoice.getItems() != null && !invoice.getItems().isEmpty()) {
+            invoice.getItems().size();
+        }
+
+        return mapToResponse(invoice);
+    }
 }
