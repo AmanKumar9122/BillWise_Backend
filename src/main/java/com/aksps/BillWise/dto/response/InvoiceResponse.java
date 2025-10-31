@@ -21,7 +21,7 @@ public class InvoiceResponse {
     private String customerContactNumber;
 
     // line items structure for the response
-    private List<InvoiceItemRequest> items;
+    private List<InvoiceItemResponse> items;
 
     // Financial Totals
     private Double subTotal;
