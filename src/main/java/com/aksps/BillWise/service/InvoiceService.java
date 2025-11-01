@@ -1,3 +1,6 @@
+// Why this file: Core service for processing sales transactions, handling financial calculations, customer management, and atomic inventory updates.
+// InvoiceService contains the main business logic for creating invoices, ensuring stock levels are checked and updated correctly, and calculating totals with discounts and taxes.
+
 package com.aksps.BillWise.service;
 
 import com.aksps.BillWise.dto.request.InvoiceItemRequest;
