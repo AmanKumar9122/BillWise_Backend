@@ -1,3 +1,7 @@
+// Description: This is the Product entity class representing products in the BillWise application.
+// Why this file is needed: It defines the structure of the Product entity, including its attributes and database mapping,
+//                          which is essential for managing product information and inventory in the billing system.
+
 package com.aksps.BillWise.model;
 
 import jakarta.persistence.*;
