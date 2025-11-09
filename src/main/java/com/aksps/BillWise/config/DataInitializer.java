@@ -52,3 +52,12 @@ public class DataInitializer {
         };
     }
 }
+
+// Summary of DataInitializer.java
+// Step	            Action	                           Description
+//  1	           App starts	            Spring Boot loads all configuration classes
+//  2	           Bean created	            CommandLineRunner bean is registered
+//  3	           Roles listed	            Defines ROLE_USER, ROLE_MANAGER, ROLE_ADMIN
+//  4	           Check database	        Looks up each role in RoleRepository
+//  5	           Create missing roles	    Saves new roles if they don’t exist
+//  6	           Logs results	            Prints logs confirming initialization
