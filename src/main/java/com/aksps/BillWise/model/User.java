@@ -42,9 +42,9 @@ public class User {
     // why set ? - to avoid duplicate roles for a user
     private Set<Role> roles = new HashSet<>();
 
-    // Constructor used for registering new users
-    // Why not including id and roles in constructor ?
-    // id is auto-generated and roles can be assigned later
+//     Constructor used for registering new users
+//     Why not including id and roles in constructor ?
+//     id is auto-generated and roles can be assigned later
 
     public User(String username ,String email , String password) {
         this.username = username;
