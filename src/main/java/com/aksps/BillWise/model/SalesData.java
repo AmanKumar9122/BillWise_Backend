@@ -37,4 +37,5 @@ public class SalesData {
     // FIX: Track physical volume (units), not monetary sales
     @Column(nullable = false)
     private Integer totalUnitsSold;
+
 }
