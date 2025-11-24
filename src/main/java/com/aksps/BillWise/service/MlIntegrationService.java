@@ -23,7 +23,7 @@ public class MlIntegrationService {
     @CircuitBreaker(name = "mlService", fallbackMethod = "predictionFallback")
     @Retry(name = "mlService")
     @TimeLimiter(name = "mlService")
-    public Mono<PredictionResponse> getSalesPrediction(PredictionRequest request) {
+    public Mono<PredictionResponse> getSalesPrediction(Long request) {
         return webClient.post()
                 .uri("/predict")
                 .bodyValue(request)
