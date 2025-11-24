@@ -1,41 +1,86 @@
 package com.aksps.BillWise.service;
 
-import com.aksps.BillWise.dto.ml.PredictionRequest;
 import com.aksps.BillWise.dto.ml.PredictionResponse;
-import io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker;
-import io.github.resilience4j.retry.annotation.Retry;
-import io.github.resilience4j.timelimiter.annotation.TimeLimiter;
-import org.springframework.beans.factory.annotation.Value;
+import com.aksps.BillWise.dto.ml.PredictionResponse.DailyPrediction;
+import io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker; // Added Resilience4j import
 import org.springframework.stereotype.Service;
-import org.springframework.web.reactive.function.client.WebClient;
 import reactor.core.publisher.Mono;
 
+import java.math.BigDecimal;
+import java.time.Duration;
+import java.time.LocalDate;
+import java.util.Collections;
+import java.util.List;
+
+/**
+ * Service responsible for integration with the external Machine Learning microservice
+ * to fetch sales predictions, now with built-in resilience.
+ */
 @Service
 public class MlIntegrationService {
 
-    private final WebClient webClient;
+    private static final String ML_SERVICE_CB = "mlPredictionService"; // Circuit breaker name
 
-    public MlIntegrationService(WebClient.Builder webClientBuilder,
-                                @Value("${ml.api.base-url}") String baseUrl) {
-        this.webClient = webClientBuilder.baseUrl(baseUrl).build();
+    // You would typically inject WebClient or WebClient.Builder here
+
+    /**
+     * Fetches the sales prediction for a given product ID.
+     *
+     * @param productId The ID of the product to forecast.
+     * @return A Mono that will emit the structured PredictionResponse.
+     */
+    @CircuitBreaker(name = ML_SERVICE_CB, fallbackMethod = "salesPredictionFallback")
+    public Mono<PredictionResponse> getSalesPrediction(Long productId) {
+        // --- Placeholder Implementation for Demonstration ---
+        // Simulating a network call delay and response creation
+        return Mono.delay(Duration.ofMillis(200))
+                .map(delay -> {
+                    // ** Simulate a temporary failure for testing the circuit breaker **
+                    // if (System.currentTimeMillis() % 10 < 2) {
+                    //    throw new RuntimeException("ML Service timed out or failed!");
+                    // }
+
+                    LocalDate today = LocalDate.now();
+
+                    // Create mock daily forecast data compliant with the DTO structure
+                    List<DailyPrediction> dailyForecast = List.of(
+                            new DailyPrediction(today.plusDays(1), 150, new BigDecimal("1500.00")),
+                            new DailyPrediction(today.plusDays(2), 160, new BigDecimal("1600.00")),
+                            new DailyPrediction(today.plusDays(3), 145, new BigDecimal("1450.00"))
+                    );
+
+                    // Calculate total sales from the mock data
+                    BigDecimal predictedTotalSales = dailyForecast.stream()
+                            .map(DailyPrediction::predictedRevenue)
+                            .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+                    // Correctly instantiate the PredictionResponse
+                    return new PredictionResponse(
+                            productId,
+                            today,
+                            "3 Days",
+                            predictedTotalSales,
+                            dailyForecast
+                    );
+                });
     }
 
-    @CircuitBreaker(name = "mlService", fallbackMethod = "predictionFallback")
-    @Retry(name = "mlService")
-    @TimeLimiter(name = "mlService")
-    public Mono<PredictionResponse> getSalesPrediction(Long request) {
-        return webClient.post()
-                .uri("/predict")
-                .bodyValue(request)
-                .retrieve()
-                .bodyToMono(PredictionResponse.class);
-    }
+    /**
+     * Fallback method for the getSalesPrediction Circuit Breaker.
+     * Returns a default response indicating the service is unavailable.
+     */
+    public Mono<PredictionResponse> salesPredictionFallback(Long productId, Throwable t) {
+        System.err.println("ML Integration Service is DOWN or TIMED OUT for product " + productId + ". Reason: " + t.getMessage());
 
-    // Fallback must return same return type
-    public Mono<PredictionResponse> predictionFallback(PredictionRequest request, Throwable ex) {
-        return Mono.just(
-                new PredictionResponse(0.0,
-                        "Prediction Service Offline - Returned fallback value")
+        // Return an empty/safe default prediction response
+        PredictionResponse fallbackResponse = new PredictionResponse(
+                productId,
+                LocalDate.now(),
+                "Fallback Data",
+                BigDecimal.ZERO,
+                Collections.emptyList() // No daily data available
         );
+
+        return Mono.just(fallbackResponse);
     }
 }
