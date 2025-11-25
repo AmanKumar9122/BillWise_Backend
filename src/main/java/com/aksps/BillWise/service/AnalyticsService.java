@@ -1,14 +1,17 @@
 package com.aksps.BillWise.service;
 
 import com.aksps.BillWise.dto.ml.PredictionResponse;
+import com.aksps.BillWise.dto.projection.TopProductProjection;
 import com.aksps.BillWise.dto.response.ProductResponse;
 import com.aksps.BillWise.dto.response.TopProductResponse;
 import com.aksps.BillWise.model.Product;
 import com.aksps.BillWise.repository.ProductRepository;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import reactor.core.publisher.Mono;
 
-import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -33,7 +36,7 @@ public class AnalyticsService {
     }
 
     /**
-     * Fetch products that have reached minimum stock levels.
+     * Fetch products that are below minimum stock threshold.
      */
     public List<ProductResponse> getLowStockProducts() {
         return productRepository.findProductsLowInStock()
@@ -43,37 +46,35 @@ public class AnalyticsService {
     }
 
     /**
-     * Calls ML Microservice asynchronously to predict demand.
+     * Calls ML microservice asynchronously to predict demand.
      */
     public Mono<PredictionResponse> getPredictedSales(Long productId) {
         return mlIntegrationService.getSalesPrediction(productId);
     }
 
     /**
-     * Retrieves top selling products ranked by revenue.
-     *
-     * @param days The evaluation period (ex: last 30 days)
-     * @return List of TopProductResponse projection DTO
+     * Retrieves top selling products ranked by revenue in last N days.
      */
-    public List<TopProductResponse> getTopSellingProducts(int days) {
+    public Page<TopProductResponse> getTopSellingProducts(int days, int page, int limit) {
         LocalDateTime startDate = LocalDateTime.now().minusDays(days);
+        Pageable pageable = PageRequest.of(page, limit);
 
-        List<Object[]> rawResults = productRepository.findTopSellingProductsByRevenue(startDate);
+        Page<TopProductProjection> resultPage =
+                productRepository.findTopSellingProductsByRevenue(startDate, pageable);
 
-        return rawResults.stream()
-                .map(record -> new TopProductResponse(
-                        (Long) record[0],              // Product Id
-                        (String) record[1],            // Product Name
-                        (String) record[2],            // SKU
-                        (String) record[3],            // Unit Type
-                        (Integer) record[4],           // Current Stock
-                        (BigDecimal) record[5]         // Revenue metric
-                ))
-                .collect(Collectors.toList());
+        return resultPage.map(p -> new TopProductResponse(
+                p.getProductId(),
+                p.getProductName(),
+                p.getSku(),
+                p.getUnitType(),
+                p.getCurrentStock(),
+                p.getTotalRevenue()
+        ));
     }
 
+
     /**
-     * Helper mapper: Product Entity → ProductResponse DTO
+     * Helper: Product Entity → ProductResponse DTO Mapper
      */
     private ProductResponse mapToProductResponse(Product p) {
         return new ProductResponse(

@@ -4,6 +4,7 @@ import com.aksps.BillWise.dto.ml.PredictionResponse;
 import com.aksps.BillWise.dto.response.ProductResponse;
 import com.aksps.BillWise.dto.response.TopProductResponse;
 import com.aksps.BillWise.service.AnalyticsService;
+import org.springframework.data.domain.Page;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -62,9 +63,14 @@ public class AnalyticsController {
      */
     @GetMapping("/top-selling")
     @PreAuthorize("hasAnyRole('ADMIN','MANAGER')")
-    public ResponseEntity<List<TopProductResponse>> getTopSellingProducts(
-            @RequestParam(defaultValue = "30") int days
+    public ResponseEntity<Page<TopProductResponse>> getTopSellingProducts(
+            @RequestParam(defaultValue = "30") int days,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int limit
     ) {
-        return ResponseEntity.ok(analyticsService.getTopSellingProducts(days));
+        return ResponseEntity.ok(
+                analyticsService.getTopSellingProducts(days, page, limit)
+        );
     }
+
 }

@@ -1,5 +1,3 @@
-// What this file does: Invoice entity storing invoice meta details and financial totals.
-
 package com.aksps.BillWise.model;
 
 import jakarta.persistence.*;
@@ -12,6 +10,10 @@ import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 
+/**
+ * Invoice entity storing invoice metadata and calculated totals.
+ * Acts as the parent document for sales transactions.
+ */
 @Entity
 @Table(name = "invoices")
 @Data
@@ -24,16 +26,19 @@ public class Invoice {
     private Long id;
 
     private String invoiceNumber;
+
     private LocalDateTime invoiceDate = LocalDateTime.now();
 
+    // Many invoices can belong to a single customer
     @ManyToOne
     @JoinColumn(name = "customer_id", nullable = true)
     private Customer customer;
 
+    // One invoice can have many items
     @OneToMany(mappedBy = "invoice", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<InvoiceItem> items = new ArrayList<>();
 
-    // Financial totals using BigDecimal for precision
+    // Financial totals using BigDecimal for accuracy
     @Column(nullable = false)
     private BigDecimal subTotal = BigDecimal.ZERO;
 
