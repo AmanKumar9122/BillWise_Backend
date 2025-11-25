@@ -1,184 +1,176 @@
-// Why this file: Core service for processing sales transactions, performing financial calculations,
-// managing customer details, updating inventory atomically, and generating invoice records.
-
 package com.aksps.BillWise.service;
 
 import com.aksps.BillWise.dto.request.InvoiceItemRequest;
 import com.aksps.BillWise.dto.request.InvoiceRequest;
-import com.aksps.BillWise.dto.request.CustomerRequest;
-import com.aksps.BillWise.dto.response.InvoiceResponse;
 import com.aksps.BillWise.dto.response.InvoiceItemResponse;
-import com.aksps.BillWise.model.Customer;
+import com.aksps.BillWise.dto.response.InvoiceResponse;
+import com.aksps.BillWise.exception.ResourceNotFoundException;
+import com.aksps.BillWise.exception.ValidationException;
 import com.aksps.BillWise.model.Invoice;
 import com.aksps.BillWise.model.InvoiceItem;
 import com.aksps.BillWise.model.Product;
 import com.aksps.BillWise.repository.InvoiceRepository;
 import com.aksps.BillWise.repository.ProductRepository;
-import com.aksps.BillWise.repository.CustomerRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Optional;
-import java.util.concurrent.atomic.AtomicReference;
+import java.util.UUID;
 import java.util.stream.Collectors;
 
+/**
+ * Core service for processing sales invoices.
+ * Handles inventory deduction, financial calculation, and transactional integrity.
+ */
 @Service
 public class InvoiceService {
 
     private final InvoiceRepository invoiceRepository;
     private final ProductRepository productRepository;
-    private final CustomerService customerService;
-    private final CustomerRepository customerRepository;
 
-    private static final BigDecimal TAX_RATE = BigDecimal.valueOf(0.18); // 18% GST
+    // Centralized rounding rules
+    private static final RoundingMode ROUNDING_MODE = RoundingMode.HALF_UP;
+    private static final int DECIMAL_SCALE = 2;
 
     public InvoiceService(InvoiceRepository invoiceRepository,
-                          ProductRepository productRepository,
-                          CustomerService customerService,
-                          CustomerRepository customerRepository) {
+                          ProductRepository productRepository) {
         this.invoiceRepository = invoiceRepository;
         this.productRepository = productRepository;
-        this.customerService = customerService;
-        this.customerRepository = customerRepository;
     }
 
-    @Transactional(rollbackFor = Exception.class)
+    /**
+     * Creates a new Invoice, deducts stock, and calculates all financial totals.
+     * This entire method is transactional to ensure atomicity.
+     */
+    @Transactional
     public InvoiceResponse createInvoice(InvoiceRequest request) {
 
-        Customer customer = handleCustomer(request.getCustomerContactNumber(), request.getCustomerName());
-
+        // 1. Build the invoice header
         Invoice invoice = new Invoice();
-        invoice.setCustomer(customer);
+        invoice.setInvoiceNumber(UUID.randomUUID().toString());  // Simple unique number
         invoice.setInvoiceDate(LocalDateTime.now());
+        invoice.setCustomerName(request.customerName());
 
-        AtomicReference<BigDecimal> subTotalRef = new AtomicReference<>(BigDecimal.ZERO);
-        List<InvoiceItem> items = processAndSaveItems(invoice, request.getItems(), subTotalRef);
+        List<InvoiceItem> items = new ArrayList<>();
+        BigDecimal runningSubtotal = BigDecimal.ZERO;
+        BigDecimal totalDiscount = BigDecimal.ZERO; // currently 0 — hook for future discounts
 
-        invoice.setItems(items);
-        invoice.setSubTotal(subTotalRef.get());
+        // 2. Process each line item
+        for (InvoiceItemRequest itemReq : request.items()) {
 
-        BigDecimal discountPercentage = request.getTotalDiscountPercentage() != null
-                ? BigDecimal.valueOf(request.getTotalDiscountPercentage())
-                : BigDecimal.ZERO;
+            Product product = productRepository.findById(itemReq.productId())
+                    .orElseThrow(() -> new ResourceNotFoundException(
+                            "Product not found with ID: " + itemReq.productId()
+                    ));
 
-        BigDecimal totalDiscountAmount = subTotalRef.get()
-                .multiply(discountPercentage)
-                .divide(BigDecimal.valueOf(100));
-
-        invoice.setTotalDiscount(totalDiscountAmount);
-
-        BigDecimal taxableAmount = subTotalRef.get().subtract(totalDiscountAmount);
-        BigDecimal totalTax = taxableAmount.multiply(TAX_RATE);
-        invoice.setTotalTax(totalTax);
-
-        invoice.setGrandTotal(taxableAmount.add(totalTax));
-
-        invoice.setInvoiceNumber("INV-" + (invoiceRepository.count() + 1));
-
-        Invoice savedInvoice = invoiceRepository.save(invoice);
-
-        return mapToResponse(savedInvoice);
-    }
-
-    private Customer handleCustomer(String contactNumber, String name) {
-
-        if (contactNumber == null || contactNumber.trim().isEmpty()) {
-            return null;
-        }
-
-        Optional<Customer> existingCustomer = customerRepository.findByContactNumber(contactNumber);
-
-        if (existingCustomer.isPresent()) {
-            return existingCustomer.get();
-        }
-
-        CustomerRequest newCustomer = new CustomerRequest(
-                name != null ? name : "Anonymous",
-                contactNumber,
-                null,
-                null
-        );
-
-        customerService.createCustomer(newCustomer);
-
-        return customerRepository.findByContactNumber(contactNumber)
-                .orElseThrow(() -> new RuntimeException("Failed to retrieve newly created customer."));
-    }
-
-    private List<InvoiceItem> processAndSaveItems(Invoice invoice,
-                                                  List<InvoiceItemRequest> items,
-                                                  AtomicReference<BigDecimal> subTotalRef) {
-
-        List<InvoiceItem> invoiceItems = new ArrayList<>();
-        BigDecimal runningTotal = BigDecimal.ZERO;
-
-        for (InvoiceItemRequest req : items) {
-
-            Product product = productRepository.findBySku(req.getProductSku())
-                    .orElseThrow(() -> new IllegalArgumentException("Product not found: " + req.getProductSku()));
-
-            if (product.getCurrentStock() < req.getQuantitySold()) {
-                throw new IllegalStateException("Insufficient stock for " + product.getName());
+            // Stock check
+            if (product.getCurrentStock() < itemReq.quantity()) {
+                throw new ValidationException(
+                        "Insufficient stock for product '" + product.getName() +
+                                "'. Available: " + product.getCurrentStock() +
+                                ", Requested: " + itemReq.quantity()
+                );
             }
 
-            BigDecimal lineTotal = product.getSellingPricePerBaseUnit()
-                    .multiply(BigDecimal.valueOf(req.getQuantitySold()));
-
-            runningTotal = runningTotal.add(lineTotal);
-
-            product.setCurrentStock(product.getCurrentStock() - req.getQuantitySold());
+            // Deduct stock
+            product.setCurrentStock(product.getCurrentStock() - itemReq.quantity());
             productRepository.save(product);
 
+            // Financials for this line
+            BigDecimal unitPrice = product.getSellingPricePerBaseUnit(); // BigDecimal in Product
+            BigDecimal qty = BigDecimal.valueOf(itemReq.quantity());
+
+            BigDecimal lineTotalBeforeDiscount = unitPrice
+                    .multiply(qty)
+                    .setScale(DECIMAL_SCALE, ROUNDING_MODE);
+
+            // Placeholder for future per-item discounts
+            BigDecimal itemDiscount = BigDecimal.ZERO;
+            totalDiscount = totalDiscount.add(itemDiscount);
+
+            BigDecimal lineTotal = lineTotalBeforeDiscount.subtract(itemDiscount);
+            runningSubtotal = runningSubtotal.add(lineTotal);
+
+            // Create InvoiceItem entity
             InvoiceItem item = new InvoiceItem();
             item.setInvoice(invoice);
             item.setProduct(product);
-            item.setQuantitySold(req.getQuantitySold());
-            item.setUnitPriceAtSale(product.getSellingPricePerBaseUnit());
+            item.setQuantitySold(itemReq.quantity());
+            item.setUnitPriceAtSale(unitPrice);
+            item.setItemDiscount(itemDiscount);
             item.setLineTotal(lineTotal);
 
-            invoiceItems.add(item);
+            items.add(item);
         }
 
-        subTotalRef.set(runningTotal);
-        return invoiceItems;
+        // 3. Tax & totals
+        BigDecimal taxRate = BigDecimal.valueOf(request.taxRate()); // e.g. 0.18
+
+        BigDecimal totalTax = runningSubtotal
+                .multiply(taxRate)
+                .setScale(DECIMAL_SCALE, ROUNDING_MODE);
+
+        BigDecimal grandTotal = runningSubtotal
+                .add(totalTax)
+                .setScale(DECIMAL_SCALE, ROUNDING_MODE);
+
+        // 4. Fill invoice totals
+        invoice.setSubTotal(runningSubtotal);
+        invoice.setTotalDiscount(totalDiscount);
+        invoice.setTotalTax(totalTax);
+        invoice.setGrandTotal(grandTotal);
+        invoice.setItems(items); // cascade via Invoice → InvoiceItem
+
+        // 5. Persist
+        Invoice savedInvoice = invoiceRepository.save(invoice);
+
+        // 6. Map to DTO
+        return mapToInvoiceResponse(savedInvoice);
     }
 
-    private InvoiceResponse mapToResponse(Invoice invoice) {
+    /**
+     * Retrieve a single invoice by ID and map to DTO.
+     */
+    public InvoiceResponse getInvoiceById(Long id) {
+        Invoice invoice = invoiceRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Invoice not found with ID: " + id));
 
-        String contact = invoice.getCustomer() != null ? invoice.getCustomer().getContactNumber() : null;
-        String name = invoice.getCustomer() != null ? invoice.getCustomer().getName() : "Anonymous";
+        return mapToInvoiceResponse(invoice);
+    }
 
-        List<InvoiceItemResponse> itemDtos = invoice.getItems().stream()
-                .map(i -> new InvoiceItemResponse(
-                        i.getProduct().getName(),
-                        i.getProduct().getSku(),
-                        i.getQuantitySold(),
-                        i.getUnitPriceAtSale(),
-                        i.getLineTotal()))
+    // --- Mapping helpers ---
+
+    private InvoiceResponse mapToInvoiceResponse(Invoice invoice) {
+        List<InvoiceItemResponse> itemResponses = invoice.getItems().stream()
+                .map(this::mapToInvoiceItemResponse)
                 .collect(Collectors.toList());
 
         return new InvoiceResponse(
                 invoice.getId(),
                 invoice.getInvoiceNumber(),
                 invoice.getInvoiceDate(),
-                name,
-                contact,
-                itemDtos,
+                invoice.getCustomerName(),
                 invoice.getSubTotal(),
                 invoice.getTotalDiscount(),
                 invoice.getTotalTax(),
-                invoice.getGrandTotal()
+                invoice.getGrandTotal(),
+                itemResponses
         );
     }
 
-    public InvoiceResponse getInvoiceResponseById(Long id) {
-        Invoice invoice = invoiceRepository.findById(id)
-                .orElseThrow(() -> new IllegalArgumentException("Invoice not found: " + id));
-
-        return mapToResponse(invoice);
+    private InvoiceItemResponse mapToInvoiceItemResponse(InvoiceItem item) {
+        return new InvoiceItemResponse(
+                item.getId(),
+                item.getProduct().getId(),
+                item.getProduct().getName(),
+                item.getQuantitySold(),
+                item.getUnitPriceAtSale(),
+                item.getLineTotal(),
+                item.getItemDiscount()
+        );
     }
 }

@@ -2,6 +2,8 @@ package com.aksps.BillWise.controller;
 
 import com.aksps.BillWise.dto.request.InvoiceRequest;
 import com.aksps.BillWise.dto.response.InvoiceResponse;
+import com.aksps.BillWise.exception.ResourceNotFoundException;
+import com.aksps.BillWise.exception.ValidationException;
 import com.aksps.BillWise.service.InvoiceService;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
@@ -11,7 +13,7 @@ import org.springframework.web.bind.annotation.*;
 
 /**
  * REST Controller for managing Invoice/Sales Transactions.
- * Exposes the core endpoint for processing a sale and deducting inventory.
+ * Exposes endpoints to create and fetch invoices.
  */
 @RestController
 @RequestMapping("/api/invoices")
@@ -24,37 +26,33 @@ public class InvoiceController {
     }
 
     /**
-     * Processes a new sale transaction (CREATE operation).
-     * This is the core billing endpoint.
-     * Accessible by ADMIN and MANAGER roles, or potentially a specific 'CASHIER' role.
+     * Core billing endpoint: creates a new invoice & deducts inventory.
      */
     @PostMapping
     @PreAuthorize("hasAnyRole('ADMIN', 'MANAGER')")
     public ResponseEntity<?> createInvoice(@Valid @RequestBody InvoiceRequest invoiceRequest) {
         try {
-            InvoiceResponse processedInvoice = invoiceService.createInvoice(invoiceRequest);
-            return new ResponseEntity<>(processedInvoice, HttpStatus.CREATED);
-        } catch (IllegalArgumentException e) {
-            // Handles errors like "Product not found"
-            return ResponseEntity.badRequest().body("Error in Request: " + e.getMessage());
-        } catch (IllegalStateException e) {
-            // Handles critical errors like "Insufficient stock" (Inventory Check)
-            return ResponseEntity.status(HttpStatus.CONFLICT).body("Transaction Failed: " + e.getMessage());
+            InvoiceResponse processed = invoiceService.createInvoice(invoiceRequest);
+            return new ResponseEntity<>(processed, HttpStatus.CREATED);
+        } catch (ResourceNotFoundException | ValidationException e) {
+            return ResponseEntity.badRequest().body(e.getMessage());
         } catch (RuntimeException e) {
-            // Handles unexpected errors like DB transaction failure or Role not found
-            return ResponseEntity.internalServerError().body("System Error during Invoice Creation: " + e.getMessage());
+            return ResponseEntity.internalServerError()
+                    .body("System error during invoice creation: " + e.getMessage());
         }
     }
 
-    // Optional: Add GET endpoints for retrieving invoice history for auditing/printing
-
-    public ResponseEntity<InvoiceResponse> getInvoiceById(@PathVariable Long id) {
+    /**
+     * Fetch a single invoice by its ID (for viewing/printing/auditing).
+     */
+    @GetMapping("/{id}")
+    @PreAuthorize("hasAnyRole('ADMIN', 'MANAGER')")
+    public ResponseEntity<?> getInvoiceById(@PathVariable Long id) {
         try {
-            InvoiceResponse invoice = invoiceService.getInvoiceResponseById(id);
+            InvoiceResponse invoice = invoiceService.getInvoiceById(id);
             return ResponseEntity.ok(invoice);
-        } catch (IllegalArgumentException e) {
-            // Returns 404 if the invoice is not found
-            return ResponseEntity.notFound().build();
+        } catch (ResourceNotFoundException e) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(e.getMessage());
         }
     }
 }
