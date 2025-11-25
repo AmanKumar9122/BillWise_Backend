@@ -9,6 +9,8 @@ import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.math.BigDecimal;
+
 @Entity
 @Table(name = "products")
 @Data
@@ -23,7 +25,7 @@ public class Product {
     private String name;
     private String sku;
 
-    private Double sellingPricePerBaseUnit;
+    private BigDecimal sellingPricePerBaseUnit;
 
     @Enumerated(EnumType.STRING)
     private UnitType unitType;
@@ -33,7 +35,7 @@ public class Product {
     private Integer currentStock;
     private Integer minStockLevel;
 
-    public Product(String name, String sku, Double sellingPricePerBaseUnit, UnitType unitType, String baseUnit, Integer currentStock, Integer minStockLevel) {
+    public Product(String name, String sku, BigDecimal sellingPricePerBaseUnit, UnitType unitType, String baseUnit, Integer currentStock, Integer minStockLevel) {
         this.name = name;
         this.sku = sku;
         this.sellingPricePerBaseUnit = sellingPricePerBaseUnit;

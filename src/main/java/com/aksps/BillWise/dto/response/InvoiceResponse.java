@@ -1,12 +1,14 @@
-// What it does: This class represents the response structure for an invoice, including customer details, line items, and financial totals.
-// Why needed: It is used to transfer invoice data from the server to the client in the BillWise application.
+// What it does: DTO used to return invoice details back to clients including
+//               customer summary, itemized billing details, and financial totals.
+// Why needed: Cleanly separates response formatting from database entities.
+
 package com.aksps.BillWise.dto.response;
 
-import com.aksps.BillWise.dto.request.InvoiceItemRequest;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
 
@@ -14,18 +16,20 @@ import java.util.List;
 @NoArgsConstructor
 @AllArgsConstructor
 public class InvoiceResponse {
+
     private Long id;
     private String invoiceNumber;
     private LocalDateTime invoiceDate;
+
     private String customerName;
     private String customerContactNumber;
 
-    // line items structure for the response
+    // Line item details for display in UI
     private List<InvoiceItemResponse> items;
 
-    // Financial Totals
-    private Double subTotal;
-    private Double totalDiscount;
-    private Double totalTax;
-    private Double grandTotal;
+    // Financial totals calculated during invoice creation
+    private BigDecimal subTotal;
+    private BigDecimal totalDiscount;
+    private BigDecimal totalTax;
+    private BigDecimal grandTotal;
 }

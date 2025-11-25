@@ -1,5 +1,4 @@
-// What this file does: This file defines the Invoice entity for the BillWise application,
-//                      representing an invoice with its details, customer link, and associated line items.
+// What this file does: Invoice entity storing invoice meta details and financial totals.
 
 package com.aksps.BillWise.model;
 
@@ -8,6 +7,7 @@ import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
@@ -17,32 +17,32 @@ import java.util.List;
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
-
 public class Invoice {
+
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    private String invoiceNumber; // Auto-generated/Sequence number
-
+    private String invoiceNumber;
     private LocalDateTime invoiceDate = LocalDateTime.now();
 
-    // Link to the Customer
-    // what this does: Associates the invoice with a customer, allowing for tracking of customer-specific transactions.
-    // manytoone relationship because many invoices can belong to one customer
     @ManyToOne
-    @JoinColumn(name = "customer_id", nullable = true) // Nullable because a transaction might be anonymous
+    @JoinColumn(name = "customer_id", nullable = true)
     private Customer customer;
 
-    // Line items associated with this invoice
-    // what this does: Represents the individual items or services billed in this invoice.
-    // onetomany relationship because one invoice can have many invoice items
     @OneToMany(mappedBy = "invoice", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<InvoiceItem> items = new ArrayList<>();
 
-    // Financial Totals
-    private Double subTotal;
-    private Double totalDiscount;
-    private Double totalTax;
-    private Double grandTotal;
+    // Financial totals using BigDecimal for precision
+    @Column(nullable = false)
+    private BigDecimal subTotal = BigDecimal.ZERO;
+
+    @Column(nullable = false)
+    private BigDecimal totalDiscount = BigDecimal.ZERO;
+
+    @Column(nullable = false)
+    private BigDecimal totalTax = BigDecimal.ZERO;
+
+    @Column(nullable = false)
+    private BigDecimal grandTotal = BigDecimal.ZERO;
 }

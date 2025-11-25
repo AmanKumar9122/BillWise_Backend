@@ -1,19 +1,23 @@
 package com.aksps.BillWise.controller;
 
-import com.aksps.BillWise.dto.request.ProductRequest;
 import com.aksps.BillWise.dto.response.ProductResponse;
 import com.aksps.BillWise.service.ProductService;
-import jakarta.validation.Valid;
-import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
 
 /**
- * REST Controller for managing Product Inventory.
- * Secured using JWT and role-based authorization (@PreAuthorize).
+ * Public / general product access controller.
+ * Base Path: /api/products
+ * Responsibilities:
+ *  - List all products
+ *  - Get product by ID
+ * Roles: USER, MANAGER, ADMIN
  */
 @RestController
 @RequestMapping("/api/products")
@@ -26,11 +30,11 @@ public class ProductController {
     }
 
     /**
-     * Retrieves a list of all products (READ operation).
+     * Retrieves a list of all products.
      * Accessible by any authenticated user.
      */
     @GetMapping
-    @PreAuthorize("hasAnyRole('ADMIN', 'MANAGER', 'USER')")
+    @PreAuthorize("hasAnyRole('USER','MANAGER','ADMIN')")
     public ResponseEntity<List<ProductResponse>> getAllProducts() {
         List<ProductResponse> products = productService.getAllProducts();
         return ResponseEntity.ok(products);
@@ -47,52 +51,6 @@ public class ProductController {
             ProductResponse product = productService.getProductById(id);
             return ResponseEntity.ok(product);
         } catch (IllegalArgumentException e) {
-            return ResponseEntity.notFound().build();
-        }
-    }
-
-    /**
-     * Creates a new product (CREATE operation).
-     * Only accessible by ADMIN and MANAGER roles.
-     */
-    @PostMapping
-    @PreAuthorize("hasAnyRole('ADMIN', 'MANAGER')")
-    public ResponseEntity<?> createProduct(@Valid @RequestBody ProductRequest productRequest) {
-        try {
-            ProductResponse createdProduct = productService.createProduct(productRequest);
-            return new ResponseEntity<>(createdProduct, HttpStatus.CREATED);
-        } catch (IllegalArgumentException e) {
-            return ResponseEntity.badRequest().body("Error: " + e.getMessage());
-        }
-    }
-
-    /**
-     * Updates an existing product (UPDATE operation).
-     * Only accessible by ADMIN and MANAGER roles.
-     */
-    @PutMapping("/{id}")
-    @PreAuthorize("hasAnyRole('ADMIN', 'MANAGER')")
-    public ResponseEntity<?> updateProduct(@PathVariable Long id, @Valid @RequestBody ProductRequest productRequest) {
-        try {
-            ProductResponse updatedProduct = productService.updateProduct(id, productRequest);
-            return ResponseEntity.ok(updatedProduct);
-        } catch (IllegalArgumentException e) {
-            return ResponseEntity.badRequest().body("Error: " + e.getMessage());
-        }
-    }
-
-    /**
-     * Deletes a product (DELETE operation).
-     * Only accessible by ADMIN role (high-level control).
-     */
-    @DeleteMapping("/{id}")
-    @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<Void> deleteProduct(@PathVariable Long id) {
-        try {
-            productService.deleteProduct(id);
-            return ResponseEntity.noContent().build();
-        } catch (IllegalArgumentException e) {
-            // Returns 404 if the product doesn't exist
             return ResponseEntity.notFound().build();
         }
     }

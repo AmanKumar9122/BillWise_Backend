@@ -7,6 +7,8 @@ import jakarta.validation.constraints.NotNull;
 import com.aksps.BillWise.model.UnitType;
 import lombok.Data;
 
+import java.math.BigDecimal;
+
 @Data
 public class ProductRequest {
     @NotBlank(message = "Product name is required.")
@@ -17,7 +19,7 @@ public class ProductRequest {
 
     @NotNull(message = "Price per base unit is required.")
     @DecimalMin(value = "0.01", message = "Price per base unit must be greater than zero.")
-    private Double sellingPricePerBaseUnit;
+    private BigDecimal sellingPricePerBaseUnit;
 
     @NotNull(message = "Unit type (WEIGHT, LIQUID, COUNT) is required.")
     private UnitType unitType;

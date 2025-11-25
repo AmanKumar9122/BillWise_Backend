@@ -1,28 +1,19 @@
 package com.aksps.BillWise.dto.response;
 
 import com.aksps.BillWise.model.UnitType;
-import lombok.AllArgsConstructor;
-import lombok.Data;
-import lombok.NoArgsConstructor;
+
+import java.math.BigDecimal;
 
 /**
- * DTO for responding with Product details to the client.
- * Provides necessary display information while hiding sensitive internal fields.
+ * DTO for sending Product details to the client (read-only view).
+ * Excludes sensitive data like cost price.
  */
-@Data
-@NoArgsConstructor
-@AllArgsConstructor
-public class ProductResponse {
-    private Long id;
-    private String name;
-    private String sku;
-
-    // Price details for client display
-    private Double sellingPricePerBaseUnit;
-    private UnitType unitType;
-    private String baseUnit;
-
-    // Inventory status
-    private Integer currentStock;
-}
-
+public record ProductResponse(
+        Long id,
+        String name,
+        String sku,
+        BigDecimal sellingPricePerBaseUnit,
+        UnitType unitType,
+        String baseUnit,
+        Integer currentStock
+) {}
