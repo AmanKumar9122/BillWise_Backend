@@ -4,6 +4,7 @@ import io.jsonwebtoken.*;
 import io.jsonwebtoken.io.Decoders;
 import io.jsonwebtoken.security.Keys;
 import io.jsonwebtoken.security.SignatureException;
+import jakarta.servlet.http.HttpServletRequest;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -107,4 +108,20 @@ public class JwtTokenProvider {
         }
         return false;
     }
+    public String resolveToken(HttpServletRequest request) {
+        String bearerToken = request.getHeader("Authorization");
+
+        if (bearerToken != null && bearerToken.startsWith("Bearer ")) {
+            return bearerToken.substring(7); // Remove "Bearer "
+        }
+        return null;
+    }
+    /**
+     * Alias for backward compatibility.
+     * AuditService uses getUsernameFromToken(), so we map it to existing method.
+     */
+    public String getUsernameFromToken(String token) {
+        return getUsernameFromJWT(token);
+    }
+
 }

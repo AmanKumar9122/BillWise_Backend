@@ -16,10 +16,12 @@ import java.util.stream.Collectors;
 public class ProductService {
 
     private final ProductRepository productRepository;
+    private final AuditService auditService;  // <<< ADDED
     private static final int DEFAULT_PAGE_SIZE = 20;
 
-    public ProductService(ProductRepository productRepository) {
+    public ProductService(ProductRepository productRepository, AuditService auditService) {
         this.productRepository = productRepository;
+        this.auditService = auditService;
     }
 
     private ProductResponse mapToResponse(Product product) {
@@ -34,9 +36,9 @@ public class ProductService {
         );
     }
 
-    /**
-     * NEW: Search + Pagination + Sorting for public product browsing
-     */
+    // --------------------------------------------------------------
+    //  PAGINATION + SEARCH (existing)
+    // --------------------------------------------------------------
     public Page<ProductResponse> getProductsPaged(
             String search,
             Integer page,
@@ -68,14 +70,18 @@ public class ProductService {
         return result.map(this::mapToResponse);
     }
 
-    // ------------------ EXISTING METHODS BELOW ------------------ //
-
+    // --------------------------------------------------------------
+    //  CREATE PRODUCT  (with Audit Logging)
+    // --------------------------------------------------------------
     @Transactional
     public ProductResponse createProduct(ProductRequest request) {
+
         if (productRepository.existsBySku(request.getSku())) {
             throw new IllegalArgumentException("SKU '" + request.getSku() + "' already exists.");
         }
+
         validateUnitType(request.getUnitType(), request.getBaseUnit());
+
         Product product = new Product(
                 request.getName(),
                 request.getSku(),
@@ -85,52 +91,110 @@ public class ProductService {
                 request.getCurrentStock(),
                 request.getMinStockLevel()
         );
-        return mapToResponse(productRepository.save(product));
+
+        Product saved = productRepository.save(product);
+
+        // AUDIT LOG — new product created
+        auditService.logChange(saved.getId(), "PRODUCT_CREATED", "-", saved.getName());
+
+        return mapToResponse(saved);
     }
 
+    // --------------------------------------------------------------
+    //  READ BY ID
+    // --------------------------------------------------------------
     public ProductResponse getProductById(Long id) {
         Product product = productRepository.findById(id)
                 .orElseThrow(() -> new IllegalArgumentException("Product not found with ID: " + id));
+
         return mapToResponse(product);
     }
 
+    // --------------------------------------------------------------
+    //  UPDATE PRODUCT  (with field-level Audit Logging)
+    // --------------------------------------------------------------
     @Transactional
-    public ProductResponse updateProduct(Long id, ProductRequest request) {
-        Product product = productRepository.findById(id)
+    public ProductResponse updateProduct(Long id, ProductRequest req) {
+
+        Product p = productRepository.findById(id)
                 .orElseThrow(() -> new IllegalArgumentException("Product not found with ID: " + id));
 
-        if (!product.getSku().equals(request.getSku()) &&
-                productRepository.existsBySku(request.getSku())) {
-            throw new IllegalArgumentException("SKU '" + request.getSku() + "' already exists.");
+        if (!p.getSku().equals(req.getSku()) &&
+                productRepository.existsBySku(req.getSku())) {
+            throw new IllegalArgumentException("SKU '" + req.getSku() + "' already exists.");
         }
 
-        validateUnitType(request.getUnitType(), request.getBaseUnit());
+        validateUnitType(req.getUnitType(), req.getBaseUnit());
 
-        product.setName(request.getName());
-        product.setSku(request.getSku());
-        product.setSellingPricePerBaseUnit(request.getSellingPricePerBaseUnit());
-        product.setUnitType(request.getUnitType());
-        product.setBaseUnit(request.getBaseUnit());
-        product.setCurrentStock(request.getCurrentStock());
-        product.setMinStockLevel(request.getMinStockLevel());
+        // --------- AUDIT CHANGES ---------
+        if (!p.getName().equals(req.getName())) {
+            auditService.logChange(id, "name", p.getName(), req.getName());
+            p.setName(req.getName());
+        }
 
-        return mapToResponse(productRepository.save(product));
+        if (!p.getSku().equals(req.getSku())) {
+            auditService.logChange(id, "sku", p.getSku(), req.getSku());
+            p.setSku(req.getSku());
+        }
+
+        if (!p.getSellingPricePerBaseUnit().equals(req.getSellingPricePerBaseUnit())) {
+            auditService.logChange(id, "sellingPricePerBaseUnit",
+                    p.getSellingPricePerBaseUnit(),
+                    req.getSellingPricePerBaseUnit());
+            p.setSellingPricePerBaseUnit(req.getSellingPricePerBaseUnit());
+        }
+
+        if (!p.getUnitType().equals(req.getUnitType())) {
+            auditService.logChange(id, "unitType", p.getUnitType(), req.getUnitType());
+            p.setUnitType(req.getUnitType());
+        }
+
+        if (!p.getBaseUnit().equals(req.getBaseUnit())) {
+            auditService.logChange(id, "baseUnit", p.getBaseUnit(), req.getBaseUnit());
+            p.setBaseUnit(req.getBaseUnit());
+        }
+
+        if (!p.getCurrentStock().equals(req.getCurrentStock())) {
+            auditService.logChange(id, "currentStock", p.getCurrentStock(), req.getCurrentStock());
+            p.setCurrentStock(req.getCurrentStock());
+        }
+
+        if (!p.getMinStockLevel().equals(req.getMinStockLevel())) {
+            auditService.logChange(id, "minStockLevel", p.getMinStockLevel(), req.getMinStockLevel());
+            p.setMinStockLevel(req.getMinStockLevel());
+        }
+
+        // ----------------------------------
+
+        return mapToResponse(productRepository.save(p));
     }
 
+    // --------------------------------------------------------------
+    //  READ ALL
+    // --------------------------------------------------------------
     public List<ProductResponse> getAllProducts() {
         return productRepository.findAll().stream()
                 .map(this::mapToResponse)
                 .collect(Collectors.toList());
     }
 
+    // --------------------------------------------------------------
+    //  DELETE PRODUCT (with audit)
+    // --------------------------------------------------------------
     @Transactional
     public void deleteProduct(Long id) {
         if (!productRepository.existsById(id)) {
             throw new IllegalArgumentException("Product not found with ID: " + id);
         }
+
+        auditService.logChange(id, "PRODUCT_DELETED", "-", "-");
+
         productRepository.deleteById(id);
     }
 
+    // --------------------------------------------------------------
+    //  HELPERS
+    // --------------------------------------------------------------
     private void validateUnitType(UnitType type, String baseUnit) {
         String unit = baseUnit.toLowerCase().trim();
 
