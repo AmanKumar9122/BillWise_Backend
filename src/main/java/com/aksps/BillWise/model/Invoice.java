@@ -1,5 +1,3 @@
-// What this file does: Invoice entity storing invoice meta details and financial totals.
-
 package com.aksps.BillWise.model;
 
 import jakarta.persistence.*;
@@ -29,6 +27,10 @@ public class Invoice {
 
     @Column(nullable = false)
     private String customerName;
+
+    @ManyToOne
+    @JoinColumn(name = "customer_id")
+    private Customer customer;
 
     @OneToMany(mappedBy = "invoice", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<InvoiceItem> items = new ArrayList<>();

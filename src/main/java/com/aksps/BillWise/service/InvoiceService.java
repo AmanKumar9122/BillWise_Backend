@@ -7,9 +7,11 @@ import com.aksps.BillWise.dto.response.InvoiceItemResponse;
 import com.aksps.BillWise.dto.response.InvoiceResponse;
 import com.aksps.BillWise.exception.ResourceNotFoundException;
 import com.aksps.BillWise.exception.ValidationException;
+import com.aksps.BillWise.model.Customer;
 import com.aksps.BillWise.model.Invoice;
 import com.aksps.BillWise.model.InvoiceItem;
 import com.aksps.BillWise.model.Product;
+import com.aksps.BillWise.repository.CustomerRepository;
 import com.aksps.BillWise.repository.InvoiceRepository;
 import com.aksps.BillWise.repository.ProductRepository;
 import org.springframework.stereotype.Service;
@@ -19,49 +21,69 @@ import org.springframework.data.domain.*;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDateTime;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.UUID;
+import java.util.*;
 import java.util.stream.Collectors;
 
-/**
- * Core service for processing sales invoices.
- * Handles inventory deduction, financial calculation, and transactional integrity.
- */
 @Service
 public class InvoiceService {
 
     private final InvoiceRepository invoiceRepository;
     private final ProductRepository productRepository;
+    private final CustomerRepository customerRepository;
 
-    // Centralized rounding rules
     private static final RoundingMode ROUNDING_MODE = RoundingMode.HALF_UP;
     private static final int DECIMAL_SCALE = 2;
 
     public InvoiceService(InvoiceRepository invoiceRepository,
-                          ProductRepository productRepository) {
+                          ProductRepository productRepository,
+                          CustomerRepository customerRepository) {
+
         this.invoiceRepository = invoiceRepository;
         this.productRepository = productRepository;
+        this.customerRepository = customerRepository;
     }
 
-    /**
-     * Creates a new Invoice, deducts stock, and calculates all financial totals.
-     * This entire method is transactional to ensure atomicity.
-     */
+
+    // ⭐ AUTO FETCH or AUTO CREATE CUSTOMER
+    private Customer resolveCustomer(InvoiceRequest request) {
+
+        return customerRepository.findByContactNumber(request.contactNumber())
+                .orElseGet(() -> {
+
+                    Customer c = new Customer(
+                            null,
+                            request.customerName(),
+                            request.contactNumber(),
+                            request.email(),
+                            request.gstNumber()
+                    );
+
+                    return customerRepository.save(c);
+                });
+    }
+
+
+    // -------------------------------------------------------------
+    // ⭐ CREATE INVOICE (Transactional)
+    // -------------------------------------------------------------
     @Transactional
     public InvoiceResponse createInvoice(InvoiceRequest request) {
 
-        // 1. Build the invoice header
+        // 1. Create or fetch customer
+        Customer customer = resolveCustomer(request);
+
+        // 2. Build invoice header
         Invoice invoice = new Invoice();
-        invoice.setInvoiceNumber(UUID.randomUUID().toString());  // Simple unique number
+        invoice.setInvoiceNumber(UUID.randomUUID().toString());
         invoice.setInvoiceDate(LocalDateTime.now());
-        invoice.setCustomerName(request.customerName());
+        invoice.setCustomer(customer);      // new: linked customer entity
+        invoice.setCustomerName(customer.getName());  // still stored for history
 
         List<InvoiceItem> items = new ArrayList<>();
-        BigDecimal runningSubtotal = BigDecimal.ZERO;
-        BigDecimal totalDiscount = BigDecimal.ZERO; // currently 0 — hook for future discounts
+        BigDecimal subtotal = BigDecimal.ZERO;
+        BigDecimal totalDiscount = BigDecimal.ZERO;
 
-        // 2. Process each line item
+        // 3. Process invoice line items
         for (InvoiceItemRequest itemReq : request.items()) {
 
             Product product = productRepository.findById(itemReq.productId())
@@ -69,11 +91,10 @@ public class InvoiceService {
                             "Product not found with ID: " + itemReq.productId()
                     ));
 
-            // Stock check
             if (product.getCurrentStock() < itemReq.quantity()) {
                 throw new ValidationException(
-                        "Insufficient stock for product '" + product.getName() +
-                                "'. Available: " + product.getCurrentStock() +
+                        "Insufficient stock for '" + product.getName() + "'. " +
+                                "Available: " + product.getCurrentStock() +
                                 ", Requested: " + itemReq.quantity()
                 );
             }
@@ -82,22 +103,19 @@ public class InvoiceService {
             product.setCurrentStock(product.getCurrentStock() - itemReq.quantity());
             productRepository.save(product);
 
-            // Financials for this line
-            BigDecimal unitPrice = product.getSellingPricePerBaseUnit(); // BigDecimal in Product
+            // Financial calculation
+            BigDecimal unitPrice = product.getSellingPricePerBaseUnit();
             BigDecimal qty = BigDecimal.valueOf(itemReq.quantity());
 
-            BigDecimal lineTotalBeforeDiscount = unitPrice
-                    .multiply(qty)
+            BigDecimal lineTotalBeforeDiscount = unitPrice.multiply(qty)
                     .setScale(DECIMAL_SCALE, ROUNDING_MODE);
 
-            // Placeholder for future per-item discounts
             BigDecimal itemDiscount = BigDecimal.ZERO;
-            totalDiscount = totalDiscount.add(itemDiscount);
-
             BigDecimal lineTotal = lineTotalBeforeDiscount.subtract(itemDiscount);
-            runningSubtotal = runningSubtotal.add(lineTotal);
 
-            // Create InvoiceItem entity
+            subtotal = subtotal.add(lineTotal);
+
+            // Create invoice item
             InvoiceItem item = new InvoiceItem();
             item.setInvoice(invoice);
             item.setProduct(product);
@@ -109,45 +127,81 @@ public class InvoiceService {
             items.add(item);
         }
 
-        // 3. Tax & totals
-        BigDecimal taxRate = BigDecimal.valueOf(request.taxRate()); // e.g. 0.18
+        // 4. Tax & totals
+        BigDecimal taxRate = BigDecimal.valueOf(request.taxRate());
+        BigDecimal totalTax = subtotal.multiply(taxRate).setScale(DECIMAL_SCALE, ROUNDING_MODE);
 
-        BigDecimal totalTax = runningSubtotal
-                .multiply(taxRate)
-                .setScale(DECIMAL_SCALE, ROUNDING_MODE);
+        BigDecimal grandTotal = subtotal.add(totalTax).setScale(DECIMAL_SCALE, ROUNDING_MODE);
 
-        BigDecimal grandTotal = runningSubtotal
-                .add(totalTax)
-                .setScale(DECIMAL_SCALE, ROUNDING_MODE);
-
-        // 4. Fill invoice totals
-        invoice.setSubTotal(runningSubtotal);
+        invoice.setSubTotal(subtotal);
         invoice.setTotalDiscount(totalDiscount);
         invoice.setTotalTax(totalTax);
         invoice.setGrandTotal(grandTotal);
-        invoice.setItems(items); // cascade via Invoice → InvoiceItem
+        invoice.setItems(items);
 
-        // 5. Persist
-        Invoice savedInvoice = invoiceRepository.save(invoice);
+        // 5. Save invoice
+        Invoice saved = invoiceRepository.save(invoice);
 
-        // 6. Map to DTO
-        return mapToInvoiceResponse(savedInvoice);
+        return mapToInvoiceResponse(saved);
     }
 
-    /**
-     * Retrieve a single invoice by ID and map to DTO.
-     */
+
+    // -------------------------------------------------------------
+    // ⭐ GET SINGLE INVOICE
+    // -------------------------------------------------------------
     public InvoiceResponse getInvoiceById(Long id) {
+
         Invoice invoice = invoiceRepository.findById(id)
-                .orElseThrow(() -> new ResourceNotFoundException("Invoice not found with ID: " + id));
+                .orElseThrow(() ->
+                        new ResourceNotFoundException("Invoice not found with ID: " + id));
 
         return mapToInvoiceResponse(invoice);
     }
 
-    // --- Mapping helpers ---
 
+    // -------------------------------------------------------------
+    // ⭐ FILTERED + PAGINATED INVOICE LIST
+    // -------------------------------------------------------------
+    public Page<InvoiceResponse> getInvoices(
+            InvoiceFilterRequest filter,
+            int page,
+            int size,
+            String sortBy,
+            String direction
+    ) {
+
+        Pageable pageable = PageRequest.of(
+                page,
+                size,
+                direction.equalsIgnoreCase("desc") ?
+                        Sort.Direction.DESC : Sort.Direction.ASC,
+                sortBy
+        );
+
+        LocalDateTime startDate = filter.startDate() != null ?
+                filter.startDate().atStartOfDay() : null;
+
+        LocalDateTime endDate = filter.endDate() != null ?
+                filter.endDate().atTime(23, 59, 59) : null;
+
+        // Custom repository method
+        Page<Invoice> invoices = invoiceRepository.searchInvoices(
+                filter.customerName(),
+                startDate,
+                endDate,
+                pageable
+        );
+
+        return invoices.map(this::mapToInvoiceResponse);
+    }
+
+
+    // -------------------------------------------------------------
+    // ⭐ Mapping Helpers
+    // -------------------------------------------------------------
     private InvoiceResponse mapToInvoiceResponse(Invoice invoice) {
-        List<InvoiceItemResponse> itemResponses = invoice.getItems().stream()
+
+        List<InvoiceItemResponse> items = invoice.getItems().stream()
                 .map(this::mapToInvoiceItemResponse)
                 .collect(Collectors.toList());
 
@@ -160,11 +214,12 @@ public class InvoiceService {
                 invoice.getTotalDiscount(),
                 invoice.getTotalTax(),
                 invoice.getGrandTotal(),
-                itemResponses
+                items
         );
     }
 
     private InvoiceItemResponse mapToInvoiceItemResponse(InvoiceItem item) {
+
         return new InvoiceItemResponse(
                 item.getId(),
                 item.getProduct().getId(),
@@ -174,38 +229,5 @@ public class InvoiceService {
                 item.getLineTotal(),
                 item.getItemDiscount()
         );
-    }
-
-
-    public Page<InvoiceResponse> getInvoices(
-            InvoiceFilterRequest filter,
-            int page,
-            int size,
-            String sortBy,
-            String direction
-    ) {
-        Pageable pageable = PageRequest.of(
-                page,
-                size,
-                direction.equalsIgnoreCase("desc") ? Sort.Direction.DESC : Sort.Direction.ASC,
-                sortBy
-        );
-
-        LocalDateTime startDate = filter.startDate() != null
-                ? filter.startDate().atStartOfDay()
-                : null;
-
-        LocalDateTime endDate = filter.endDate() != null
-                ? filter.endDate().atTime(23, 59, 59)
-                : null;
-
-        Page<Invoice> invoices = invoiceRepository.searchInvoices(
-                filter.customerName(),
-                startDate,
-                endDate,
-                pageable
-        );
-
-        return invoices.map(this::mapToInvoiceResponse);
     }
 }
