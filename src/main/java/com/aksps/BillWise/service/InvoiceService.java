@@ -1,5 +1,6 @@
 package com.aksps.BillWise.service;
 
+import com.aksps.BillWise.dto.report.InvoiceReportDetail;
 import com.aksps.BillWise.dto.request.InvoiceFilterRequest;
 import com.aksps.BillWise.dto.request.InvoiceItemRequest;
 import com.aksps.BillWise.dto.request.InvoiceRequest;
@@ -230,4 +231,56 @@ public class InvoiceService {
                 item.getItemDiscount()
         );
     }
+
+    public InvoiceReportDetail getPrintableInvoice(Long invoiceId) {
+
+        Invoice invoice = invoiceRepository.findById(invoiceId)
+                .orElseThrow(() -> new ResourceNotFoundException("Invoice not found: " + invoiceId));
+
+        // Customer details (optional if customer entity is not linked)
+        String customerName = invoice.getCustomerName();
+        String customerContact = null;
+        String customerEmail = null;
+        String customerGst = null;
+
+        if (invoice.getCustomer() != null) {
+            customerName = invoice.getCustomer().getName();
+            customerContact = invoice.getCustomer().getContactNumber();
+            customerEmail = invoice.getCustomer().getEmail();
+            customerGst = invoice.getCustomer().getGstNumber();
+        }
+
+        List<InvoiceReportDetail.ReportItem> lineItems =
+                invoice.getItems().stream().map(i -> new InvoiceReportDetail.ReportItem(
+                        i.getProduct().getName(),
+                        i.getProduct().getSku(),
+                        i.getQuantitySold(),
+                        i.getUnitPriceAtSale(),
+                        i.getLineTotal(),
+                        i.getItemDiscount()
+                )).toList();
+
+        return new InvoiceReportDetail(
+                invoice.getId(),
+                invoice.getInvoiceNumber(),
+                invoice.getInvoiceDate(),
+
+                customerName,
+                customerContact,
+                customerEmail,
+                customerGst,
+
+                "BillWise Store",
+                "Purani Godown, Gaya, Bihar",
+                "+91 9122488130",
+
+                lineItems,
+
+                invoice.getSubTotal(),
+                invoice.getTotalDiscount(),
+                invoice.getTotalTax(),
+                invoice.getGrandTotal()
+        );
+    }
+
 }

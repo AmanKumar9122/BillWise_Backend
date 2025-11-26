@@ -1,5 +1,6 @@
 package com.aksps.BillWise.controller;
 
+import com.aksps.BillWise.dto.report.InvoiceReportDetail;
 import com.aksps.BillWise.dto.request.InvoiceFilterRequest;
 import com.aksps.BillWise.dto.request.InvoiceRequest;
 import com.aksps.BillWise.dto.response.InvoiceResponse;
@@ -88,5 +89,16 @@ public class InvoiceController {
                 filter, page, size, sortBy, direction
         );
         return ResponseEntity.ok(invoices);
+    }
+
+    @GetMapping("/{id}/print")
+    @PreAuthorize("hasAnyRole('ADMIN','MANAGER','USER')")
+    public ResponseEntity<?> getPrintableInvoice(@PathVariable Long id) {
+        try {
+            InvoiceReportDetail report = invoiceService.getPrintableInvoice(id);
+            return ResponseEntity.ok(report);
+        } catch (ResourceNotFoundException e) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(e.getMessage());
+        }
     }
 }
