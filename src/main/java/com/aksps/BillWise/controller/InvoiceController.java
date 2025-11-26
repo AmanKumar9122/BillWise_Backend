@@ -10,6 +10,8 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
+import com.aksps.BillWise.dto.request.InvoiceFilterRequest;
+import org.springframework.data.domain.Page;
 
 /**
  * REST Controller for managing Invoice/Sales Transactions.
@@ -55,4 +57,20 @@ public class InvoiceController {
             return ResponseEntity.status(HttpStatus.NOT_FOUND).body(e.getMessage());
         }
     }
+
+    @GetMapping
+    @PreAuthorize("hasAnyRole('ADMIN','MANAGER')")
+    public ResponseEntity<Page<InvoiceResponse>> listInvoices(
+            @ModelAttribute InvoiceFilterRequest filter,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size,
+            @RequestParam(defaultValue = "invoiceDate") String sortBy,
+            @RequestParam(defaultValue = "desc") String direction
+    ) {
+        Page<InvoiceResponse> invoices =
+                invoiceService.getInvoices(filter, page, size, sortBy, direction);
+
+        return ResponseEntity.ok(invoices);
+    }
+
 }

@@ -1,5 +1,6 @@
 package com.aksps.BillWise.service;
 
+import com.aksps.BillWise.dto.request.InvoiceFilterRequest;
 import com.aksps.BillWise.dto.request.InvoiceItemRequest;
 import com.aksps.BillWise.dto.request.InvoiceRequest;
 import com.aksps.BillWise.dto.response.InvoiceItemResponse;
@@ -13,6 +14,7 @@ import com.aksps.BillWise.repository.InvoiceRepository;
 import com.aksps.BillWise.repository.ProductRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.data.domain.*;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
@@ -172,5 +174,38 @@ public class InvoiceService {
                 item.getLineTotal(),
                 item.getItemDiscount()
         );
+    }
+
+
+    public Page<InvoiceResponse> getInvoices(
+            InvoiceFilterRequest filter,
+            int page,
+            int size,
+            String sortBy,
+            String direction
+    ) {
+        Pageable pageable = PageRequest.of(
+                page,
+                size,
+                direction.equalsIgnoreCase("desc") ? Sort.Direction.DESC : Sort.Direction.ASC,
+                sortBy
+        );
+
+        LocalDateTime startDate = filter.startDate() != null
+                ? filter.startDate().atStartOfDay()
+                : null;
+
+        LocalDateTime endDate = filter.endDate() != null
+                ? filter.endDate().atTime(23, 59, 59)
+                : null;
+
+        Page<Invoice> invoices = invoiceRepository.searchInvoices(
+                filter.customerName(),
+                startDate,
+                endDate,
+                pageable
+        );
+
+        return invoices.map(this::mapToInvoiceResponse);
     }
 }
