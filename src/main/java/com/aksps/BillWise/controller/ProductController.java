@@ -2,18 +2,13 @@ package com.aksps.BillWise.controller;
 
 import com.aksps.BillWise.dto.response.ProductResponse;
 import com.aksps.BillWise.service.ProductService;
+import org.springframework.data.domain.Page;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
-
-import java.util.List;
 
 /**
  * Public / general product access controller.
  * Base Path: /api/products
- * Responsibilities:
- *  - List all products
- *  - Get product by ID
- * Roles: PUBLIC (no login required)
  */
 @RestController
 @RequestMapping("/api/products")
@@ -26,24 +21,32 @@ public class ProductController {
     }
 
     /**
-     * Retrieves a list of all products.
-     * Public API (no authentication required)
+     * NEW:
+     * GET /api/products?search=&page=&size=&sortBy=&direction=
+     *
+     * Public API (no login)
      */
     @GetMapping
-    public ResponseEntity<List<ProductResponse>> getAllProducts() {
-        List<ProductResponse> products = productService.getAllProducts();
-        return ResponseEntity.ok(products);
+    public ResponseEntity<Page<ProductResponse>> getProductsPaged(
+            @RequestParam(required = false) String search,
+            @RequestParam(required = false, defaultValue = "0") Integer page,
+            @RequestParam(required = false, defaultValue = "20") Integer size,
+            @RequestParam(required = false, defaultValue = "id") String sortBy,
+            @RequestParam(required = false, defaultValue = "asc") String direction
+    ) {
+        Page<ProductResponse> result = productService.getProductsPaged(
+                search, page, size, sortBy, direction
+        );
+        return ResponseEntity.ok(result);
     }
 
     /**
-     * Retrieves a single product by its ID.
-     * Public API (no authentication required)
+     * Retrieve single product by ID.
      */
     @GetMapping("/{id}")
     public ResponseEntity<ProductResponse> getProductById(@PathVariable Long id) {
         try {
-            ProductResponse product = productService.getProductById(id);
-            return ResponseEntity.ok(product);
+            return ResponseEntity.ok(productService.getProductById(id));
         } catch (IllegalArgumentException e) {
             return ResponseEntity.notFound().build();
         }

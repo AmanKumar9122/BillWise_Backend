@@ -23,12 +23,14 @@ public interface ProductRepository extends JpaRepository<Product, Long> {
     List<Product> findProductsLowInStock();
 
     /**
-     * Query to fetch top-selling products ranked by total revenue over a period.
-     * Uses the new InvoiceItem entity and aggregates total revenue (lineTotal).
-     *
-     * Projection Order (critical for AnalyticsService mapping):
-     * [0:id, 1:name, 2:sku, 3:unitType, 4:currentStock, 5:totalRevenue]
+     * NEW: Search by name or SKU (case-insensitive) + pagination
      */
+    Page<Product> findByNameContainingIgnoreCaseOrSkuContainingIgnoreCase(
+            String name,
+            String sku,
+            Pageable pageable
+    );
+
     @Query("""
         SELECT i.product.id AS productId,
                i.product.name AS productName,
@@ -45,5 +47,4 @@ public interface ProductRepository extends JpaRepository<Product, Long> {
             @Param("startDate") LocalDateTime startDate,
             Pageable pageable
     );
-
 }

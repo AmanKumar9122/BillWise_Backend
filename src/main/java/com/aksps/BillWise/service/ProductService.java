@@ -5,6 +5,7 @@ import com.aksps.BillWise.dto.response.ProductResponse;
 import com.aksps.BillWise.model.Product;
 import com.aksps.BillWise.model.UnitType;
 import com.aksps.BillWise.repository.ProductRepository;
+import org.springframework.data.domain.*;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -15,6 +16,7 @@ import java.util.stream.Collectors;
 public class ProductService {
 
     private final ProductRepository productRepository;
+    private static final int DEFAULT_PAGE_SIZE = 20;
 
     public ProductService(ProductRepository productRepository) {
         this.productRepository = productRepository;
@@ -32,16 +34,48 @@ public class ProductService {
         );
     }
 
-    // --- CREATE ---
+    /**
+     * NEW: Search + Pagination + Sorting for public product browsing
+     */
+    public Page<ProductResponse> getProductsPaged(
+            String search,
+            Integer page,
+            Integer size,
+            String sortBy,
+            String direction
+    ) {
+        int p = page != null ? Math.max(page, 0) : 0;
+        int s = size != null ? Math.max(size, 1) : DEFAULT_PAGE_SIZE;
+
+        Sort sort = Sort.by(
+                direction != null && direction.equalsIgnoreCase("desc")
+                        ? Sort.Direction.DESC
+                        : Sort.Direction.ASC,
+                sortBy != null ? sortBy : "id"
+        );
+
+        Pageable pageable = PageRequest.of(p, s, sort);
+
+        Page<Product> result;
+
+        if (search == null || search.isBlank()) {
+            result = productRepository.findAll(pageable);
+        } else {
+            result = productRepository
+                    .findByNameContainingIgnoreCaseOrSkuContainingIgnoreCase(search, search, pageable);
+        }
+
+        return result.map(this::mapToResponse);
+    }
+
+    // ------------------ EXISTING METHODS BELOW ------------------ //
+
     @Transactional
     public ProductResponse createProduct(ProductRequest request) {
-
         if (productRepository.existsBySku(request.getSku())) {
             throw new IllegalArgumentException("SKU '" + request.getSku() + "' already exists.");
         }
-
         validateUnitType(request.getUnitType(), request.getBaseUnit());
-
         Product product = new Product(
                 request.getName(),
                 request.getSku(),
@@ -51,19 +85,15 @@ public class ProductService {
                 request.getCurrentStock(),
                 request.getMinStockLevel()
         );
-
-        Product savedProduct = productRepository.save(product);
-        return mapToResponse(savedProduct);
+        return mapToResponse(productRepository.save(product));
     }
 
-    // --- READ by ID ---
     public ProductResponse getProductById(Long id) {
         Product product = productRepository.findById(id)
                 .orElseThrow(() -> new IllegalArgumentException("Product not found with ID: " + id));
         return mapToResponse(product);
     }
 
-    // --- UPDATE ---
     @Transactional
     public ProductResponse updateProduct(Long id, ProductRequest request) {
         Product product = productRepository.findById(id)
@@ -84,18 +114,15 @@ public class ProductService {
         product.setCurrentStock(request.getCurrentStock());
         product.setMinStockLevel(request.getMinStockLevel());
 
-        Product updatedProduct = productRepository.save(product);
-        return mapToResponse(updatedProduct);
+        return mapToResponse(productRepository.save(product));
     }
 
-    // --- READ ALL ---
     public List<ProductResponse> getAllProducts() {
         return productRepository.findAll().stream()
                 .map(this::mapToResponse)
                 .collect(Collectors.toList());
     }
 
-    // --- DELETE ---
     @Transactional
     public void deleteProduct(Long id) {
         if (!productRepository.existsById(id)) {
