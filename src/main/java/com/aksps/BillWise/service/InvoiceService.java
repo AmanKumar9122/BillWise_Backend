@@ -1,6 +1,6 @@
 package com.aksps.BillWise.service;
 
-import com.aksps.BillWise.dto.report.InvoiceReportDetail;
+import com.aksps.BillWise.dto.response.InvoiceReportDetail;
 import com.aksps.BillWise.dto.request.InvoiceFilterRequest;
 import com.aksps.BillWise.dto.request.InvoiceItemRequest;
 import com.aksps.BillWise.dto.request.InvoiceRequest;
@@ -31,17 +31,20 @@ public class InvoiceService {
     private final InvoiceRepository invoiceRepository;
     private final ProductRepository productRepository;
     private final CustomerRepository customerRepository;
+    private final InvoicePdfService invoicePdfService;
 
     private static final RoundingMode ROUNDING_MODE = RoundingMode.HALF_UP;
     private static final int DECIMAL_SCALE = 2;
 
     public InvoiceService(InvoiceRepository invoiceRepository,
                           ProductRepository productRepository,
-                          CustomerRepository customerRepository) {
+                          CustomerRepository customerRepository,
+                          InvoicePdfService invoicePdfService) {
 
         this.invoiceRepository = invoiceRepository;
         this.productRepository = productRepository;
         this.customerRepository = customerRepository;
+        this.invoicePdfService = invoicePdfService;
     }
 
 
@@ -279,8 +282,19 @@ public class InvoiceService {
                 invoice.getSubTotal(),
                 invoice.getTotalDiscount(),
                 invoice.getTotalTax(),
-                invoice.getGrandTotal()
+                invoice.getGrandTotal(),
+
+                invoice.getTotalTax()
+                        .divide(invoice.getSubTotal(), 4, RoundingMode.HALF_UP)
+                        .multiply(BigDecimal.valueOf(100))   // <-- taxRatePercent
         );
+
     }
+
+    public byte[] generateInvoicePdf(Long id) {
+        InvoiceReportDetail report = getPrintableInvoice(id);
+        return invoicePdfService.generatePdf(report);
+    }
+
 
 }

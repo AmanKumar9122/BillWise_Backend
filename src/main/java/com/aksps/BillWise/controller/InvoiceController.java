@@ -1,6 +1,6 @@
 package com.aksps.BillWise.controller;
 
-import com.aksps.BillWise.dto.report.InvoiceReportDetail;
+import com.aksps.BillWise.dto.response.InvoiceReportDetail;
 import com.aksps.BillWise.dto.request.InvoiceFilterRequest;
 import com.aksps.BillWise.dto.request.InvoiceRequest;
 import com.aksps.BillWise.dto.response.InvoiceResponse;
@@ -101,4 +101,21 @@ public class InvoiceController {
             return ResponseEntity.status(HttpStatus.NOT_FOUND).body(e.getMessage());
         }
     }
+
+    @GetMapping("/{id}/pdf")
+    @PreAuthorize("isAuthenticated()") // user, manager, admin all can print
+    public ResponseEntity<byte[]> downloadInvoicePdf(@PathVariable Long id) {
+        try {
+            byte[] pdf = invoiceService.generateInvoicePdf(id);
+
+            return ResponseEntity.ok()
+                    .header("Content-Disposition", "attachment; filename=invoice-" + id + ".pdf")
+                    .contentType(org.springframework.http.MediaType.APPLICATION_PDF)
+                    .body(pdf);
+
+        } catch (ResourceNotFoundException e) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(null);
+        }
+    }
+
 }

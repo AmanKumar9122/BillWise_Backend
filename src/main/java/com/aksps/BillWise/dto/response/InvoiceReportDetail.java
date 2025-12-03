@@ -1,4 +1,4 @@
-package com.aksps.BillWise.dto.report;
+package com.aksps.BillWise.dto.response;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -23,6 +23,7 @@ public record InvoiceReportDetail(
         // Line items
         List<ReportItem> items,
 
+        BigDecimal taxRatePercent, // <-- new field
         BigDecimal subTotal,
         BigDecimal totalDiscount,
         BigDecimal totalTax,
