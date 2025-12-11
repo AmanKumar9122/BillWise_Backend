@@ -89,10 +89,21 @@ public class SecurityConfig {
                         // Public product browsing
                         .requestMatchers(HttpMethod.GET, "/api/products/**").permitAll()
 
+                        .requestMatchers("/api/ai/**").permitAll()
+
+                        // Allow unauthenticated GETs to analytics forecast (for debugging)
+                        // Place before the analytics role restriction so it takes precedence
+                        .requestMatchers(HttpMethod.GET, "/api/analytics/forecast/**").permitAll()
+
+                        // ML forecast endpoint (ROLE RESTRICTED)  ✅
+                        .requestMatchers("/api/forecast/**").hasAnyRole("ADMIN", "MANAGER")
+
                         // Admin + Manager protected zones
                         .requestMatchers("/api/admin/**").hasAnyRole("ADMIN", "MANAGER")
                         .requestMatchers("/api/analytics/**").hasAnyRole("ADMIN", "MANAGER")
                         .requestMatchers("/api/invoices/**").hasAnyRole("ADMIN", "MANAGER")
+
+
 
                         // Everything else requires authentication
                         .anyRequest().authenticated()

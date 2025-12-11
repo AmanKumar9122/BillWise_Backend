@@ -34,4 +34,7 @@ public class ProductRequest {
     @NotNull(message = "Minimum stock level for alerts is required.")
     @Min(value = 0, message = "Minimum stock level cannot be negative.")
     private Integer minStockLevel;
+
+    private Integer leadTimeDays;
+
 }

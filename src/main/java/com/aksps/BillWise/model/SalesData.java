@@ -5,6 +5,7 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 import lombok.AllArgsConstructor;
 
+import java.time.LocalDate;
 import java.time.YearMonth;
 
 /**
@@ -32,7 +33,7 @@ public class SalesData {
 
     // FIX: Use YearMonth for monthly aggregation time dimension
     @Column(name = "sale_month", nullable = false)
-    private YearMonth month;
+    private LocalDate month;
 
     // FIX: Track physical volume (units), not monetary sales
     @Column(nullable = false)

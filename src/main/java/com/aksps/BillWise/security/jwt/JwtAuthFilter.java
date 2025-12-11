@@ -42,8 +42,15 @@ public class JwtAuthFilter extends OncePerRequestFilter { // Removed @Component/
             throws ServletException, IOException {
         try {
             String jwt = getJwtFromRequest(request);
+            if (StringUtils.hasText(jwt)) {
+                logger.debug("JWT found in request: {}", jwt.length() > 20 ? jwt.substring(0, 20) + "..." : jwt);
+            } else {
+                logger.debug("No JWT found in request headers");
+            }
+
             if (StringUtils.hasText(jwt) && tokenProvider.validateToken(jwt)) {
                 String username = tokenProvider.getUsernameFromJWT(jwt);
+                logger.debug("Token validated. Username from token: {}", username);
 
                 // Load user data and build authentication object
                 UserDetails userDetails = customUserDetailsService.loadUserByUsername(username);
@@ -53,6 +60,10 @@ public class JwtAuthFilter extends OncePerRequestFilter { // Removed @Component/
 
                 // Set authentication in security context
                 SecurityContextHolder.getContext().setAuthentication(authentication);
+
+                logger.debug("Authentication set for user {} with authorities: {}", username, userDetails.getAuthorities());
+            } else {
+                logger.debug("JWT not valid or missing - skipping authentication population");
             }
         } catch (Exception ex) {
             logger.error("Could not set user authentication in security context", ex);

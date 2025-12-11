@@ -84,7 +84,8 @@ public class AnalyticsService {
                 p.getSellingPricePerBaseUnit(),
                 p.getUnitType(),
                 p.getBaseUnit(),
-                p.getCurrentStock()
+                p.getCurrentStock(),
+                p.getLeadTimeDays()
         );
     }
 }

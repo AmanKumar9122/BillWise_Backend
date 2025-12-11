@@ -29,7 +29,8 @@ public class ProductManagementService {
                 p.getSellingPricePerBaseUnit(),
                 p.getUnitType(),
                 p.getBaseUnit(),
-                p.getCurrentStock()
+                p.getCurrentStock(),
+                p.getLeadTimeDays()
         );
     }
 
@@ -45,7 +46,8 @@ public class ProductManagementService {
                 request.getUnitType(),
                 request.getBaseUnit(),
                 request.getCurrentStock(),
-                request.getMinStockLevel()
+                request.getMinStockLevel(),
+                request.getLeadTimeDays()
         );
 
         Product savedProduct = productRepository.save(newProduct);
