@@ -21,6 +21,10 @@ public class ForecastHistory {
 
     private Double predictedTotalRevenue;
 
+    private String modelVersion;
+
+    private String frequency;
+
     @Lob
     private String dailyPredictionsJson;  // store full list as JSON string
 }

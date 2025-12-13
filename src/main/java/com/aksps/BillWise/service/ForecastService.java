@@ -1,37 +1,51 @@
 package com.aksps.BillWise.service;
 
+import com.aksps.BillWise.dto.ml.PredictionResponse;
 import com.aksps.BillWise.dto.response.ForecastResponse;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
-import org.springframework.web.reactive.function.client.WebClient;
+import reactor.core.publisher.Mono;
+
+import java.time.Duration;
 
 @Service
 public class ForecastService {
 
-    private final WebClient webClient;
+    private final MlIntegrationService mlIntegrationService;
     private final ForecastHistoryService historyService;
+    private final MlAdapter mlAdapter;
 
-    public ForecastService(WebClient.Builder builder,
-                           @Value("${ml.service.base-url:http://localhost:5000}") String baseUrl,
-                           ForecastHistoryService historyService) {
-        this.webClient = builder.baseUrl(baseUrl).build();
+    public ForecastService(MlIntegrationService mlIntegrationService,
+                           ForecastHistoryService historyService,
+                           MlAdapter mlAdapter) {
+        this.mlIntegrationService = mlIntegrationService;
         this.historyService = historyService;
+        this.mlAdapter = mlAdapter;
     }
 
     public ForecastResponse getForecast(Long productId, int months) {
 
-        String url = "/forecast?product_id=" + productId + "&months=" + months;
+        // Call ML service via MlIntegrationService which returns a reactive Mono<PredictionResponse>
+        try {
+            Mono<PredictionResponse> mono = mlIntegrationService.getSalesPrediction(productId);
+            PredictionResponse pred = mono.block(Duration.ofSeconds(6)); // small blocking window
 
-        ForecastResponse response = webClient.get()
-                .uri(url)
-                .retrieve()
-                .bodyToMono(ForecastResponse.class)
-                .block();
+            ForecastResponse response = mlAdapter.toForecastResponse(pred, months);
 
-        // Save forecast to DB
-        historyService.saveForecast(productId, months, response);
+            // Detect frequency (D=Daily, M=Monthly)
+            String frequency = mlAdapter.detectFrequency(pred);
 
-        return response;
+            // Save forecast to DB with frequency (modelVersion left null for now)
+            historyService.saveForecast(productId, months, response, null, frequency);
+
+            return response;
+        } catch (Exception e) {
+            // On error, try to return last persisted forecast as fallback
+            ForecastResponse last = historyService.getLatestForecastForProduct(productId, months);
+            if (last != null) {
+                return last;
+            }
+            // If no persisted forecast, throw runtime
+            throw new RuntimeException("Failed to fetch forecast and no cached forecast available", e);
+        }
     }
 }
-
