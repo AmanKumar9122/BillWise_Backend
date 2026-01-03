@@ -18,7 +18,7 @@ public class ProductAuditController {
     }
 
     @GetMapping("/{productId}")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAnyRole('ADMIN','MANAGER')")
     public List<ProductAuditLog> getHistory(@PathVariable Long productId) {
         return repo.findByProductIdOrderByTimestampDesc(productId);
     }

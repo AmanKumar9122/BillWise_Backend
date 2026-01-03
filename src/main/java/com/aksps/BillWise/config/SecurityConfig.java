@@ -83,8 +83,12 @@ public class SecurityConfig {
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
 
-                        // Public Endpoints
-                        .requestMatchers("/api/auth/**", "/swagger-ui/**", "/v3/api-docs/**", "/actuator/**").permitAll()
+                        // Public endpoints: allow login publicly; registration requires ADMIN
+                        .requestMatchers("/api/auth/login", "/swagger-ui/**", "/v3/api-docs/**", "/actuator/**").permitAll()
+
+                        // Registration endpoint must be admin-only
+                        .requestMatchers("/api/auth/register").hasRole("ADMIN")
+
 
                         // Public product browsing
                         .requestMatchers(HttpMethod.GET, "/api/products/**").permitAll()

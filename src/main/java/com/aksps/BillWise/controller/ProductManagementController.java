@@ -6,6 +6,7 @@ import com.aksps.BillWise.exception.ResourceNotFoundException;
 import com.aksps.BillWise.exception.ValidationException;
 import com.aksps.BillWise.service.ProductManagementService;
 import jakarta.validation.Valid;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -102,6 +103,10 @@ public class ProductManagementController {
             return ResponseEntity.noContent().build();
         } catch (ResourceNotFoundException e) {
             return ResponseEntity.status(HttpStatus.NOT_FOUND).body(e.getMessage());
+        } catch (DataIntegrityViolationException e) {
+            // Product is referenced by other entities (e.g., invoice items)
+            return ResponseEntity.status(HttpStatus.CONFLICT)
+                    .body("Cannot delete product: It is referenced by existing transactions or records.");
         }
     }
 }

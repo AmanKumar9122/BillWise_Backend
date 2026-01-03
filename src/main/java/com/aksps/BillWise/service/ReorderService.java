@@ -1,48 +1,85 @@
 package com.aksps.BillWise.service;
 
+import com.aksps.BillWise.model.ForecastResult;
+import com.aksps.BillWise.model.ReorderSuggestion;
+import com.aksps.BillWise.repository.ReorderSuggestionRepository;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDate;
-import java.util.HashMap;
-import java.util.Map;
+import java.time.LocalDateTime;
 
 @Service
 public class ReorderService {
 
-    // Simple z-score table for common service levels
-    private static final Map<Double, Double> Z_TABLE = new HashMap<>();
-    static {
-        Z_TABLE.put(0.90, 1.28);
-        Z_TABLE.put(0.95, 1.65);
-        Z_TABLE.put(0.98, 2.05);
-        Z_TABLE.put(0.99, 2.33);
+    private final ReorderSuggestionRepository repo;
+
+    public ReorderService(ReorderSuggestionRepository repo) {
+        this.repo = repo;
     }
 
+    public void evaluateReorder(ForecastResult forecast, int currentStock) {
+
+        if (forecast == null) return;
+
+        Integer predicted = forecast.getPredictedUnits();
+        if (predicted == null) return;
+
+        if (predicted <= currentStock) {
+            return; // No reorder needed
+        }
+
+        int reorderQty = predicted - currentStock;
+
+        ReorderSuggestion rs = new ReorderSuggestion();
+        rs.setProductId(forecast.getProductId());
+        rs.setForecastMonth(forecast.getForecastMonth());
+        rs.setCurrentStock(currentStock);
+        rs.setPredictedDemand(predicted);
+        rs.setSuggestedReorderQty(reorderQty);
+        rs.setCreatedAt(LocalDateTime.now());
+
+        repo.save(rs);
+    }
+
+    // New API matching your requested signature
+    public void evaluate(ForecastResult forecast, int currentStock) {
+        evaluateReorder(forecast, currentStock);
+    }
+
+    // Added to satisfy existing controller's expectations.
     public static class Suggestion {
         public int suggestedQty;
         public LocalDate expectedArrival;
         public String reason;
+
+        public Suggestion(int suggestedQty, LocalDate expectedArrival, String reason) {
+            this.suggestedQty = suggestedQty;
+            this.expectedArrival = expectedArrival;
+            this.reason = reason;
+        }
     }
 
-    public Suggestion suggestReorder(int onHand, int pendingInbound, int packSize, double leadTimeDays, int forecastedDemandInLeadTime, double serviceLevel) {
-        Suggestion s = new Suggestion();
-
-        double z = Z_TABLE.getOrDefault(serviceLevel, 1.65);
-        // rough sigma estimate: assume Poisson-like demand => sigma = sqrt(mean)
-        double sigmaDaily = Math.sqrt(Math.max(1, (double)forecastedDemandInLeadTime / Math.max(1, (int)leadTimeDays)));
-        double safetyStock = z * sigmaDaily * Math.sqrt(leadTimeDays);
-
-        double raw = forecastedDemandInLeadTime + safetyStock - onHand + pendingInbound;
-        int qty = (int)Math.max(0, Math.ceil(raw));
-        // round up to pack size
-        if (packSize > 1 && qty % packSize != 0) {
-            qty = ((qty / packSize) + 1) * packSize;
+    /**
+     * Simple suggestReorder method used by InventoryController.
+     * Logic: need = forecastedDemandInLeadTime - (onHand + pendingInbound)
+     * Round up to packSize and ensure non-negative.
+     */
+    public Suggestion suggestReorder(int onHand, int pendingInbound, int packSize,
+                                     double leadTimeDays, int forecastedDemandInLeadTime, double serviceLevel) {
+        int available = onHand + pendingInbound;
+        int need = forecastedDemandInLeadTime - available;
+        if (need <= 0) {
+            return new Suggestion(0, LocalDate.now().plusDays((long)Math.ceil(leadTimeDays)), "No reorder needed");
         }
 
-        s.suggestedQty = qty;
-        s.expectedArrival = LocalDate.now().plusDays((long)Math.ceil(leadTimeDays));
-        s.reason = String.format("forecast=%d, safetyStock=%.2f, onHand=%d, pending=%d", forecastedDemandInLeadTime, safetyStock, onHand, pendingInbound);
-        return s;
+        int suggested = need;
+        if (packSize > 1) {
+            int packs = (suggested + packSize - 1) / packSize;
+            suggested = packs * packSize;
+        }
+
+        LocalDate expectedArrival = LocalDate.now().plusDays((long)Math.ceil(leadTimeDays));
+        String reason = "Predicted demand exceeds available stock";
+        return new Suggestion(suggested, expectedArrival, reason);
     }
 }
-

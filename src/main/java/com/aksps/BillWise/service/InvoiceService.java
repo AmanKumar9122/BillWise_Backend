@@ -205,19 +205,26 @@ public class InvoiceService {
     // -------------------------------------------------------------
     private InvoiceResponse mapToInvoiceResponse(Invoice invoice) {
 
-        List<InvoiceItemResponse> items = invoice.getItems().stream()
+        List<InvoiceItem> itemsList = invoice.getItems() != null ? invoice.getItems() : Collections.<InvoiceItem>emptyList();
+
+        List<InvoiceItemResponse> items = itemsList.stream()
                 .map(this::mapToInvoiceItemResponse)
                 .collect(Collectors.toList());
+
+        BigDecimal subTotal = invoice.getSubTotal() != null ? invoice.getSubTotal() : BigDecimal.ZERO;
+        BigDecimal totalDiscount = invoice.getTotalDiscount() != null ? invoice.getTotalDiscount() : BigDecimal.ZERO;
+        BigDecimal totalTax = invoice.getTotalTax() != null ? invoice.getTotalTax() : BigDecimal.ZERO;
+        BigDecimal grandTotal = invoice.getGrandTotal() != null ? invoice.getGrandTotal() : BigDecimal.ZERO;
 
         return new InvoiceResponse(
                 invoice.getId(),
                 invoice.getInvoiceNumber(),
                 invoice.getInvoiceDate(),
                 invoice.getCustomerName(),
-                invoice.getSubTotal(),
-                invoice.getTotalDiscount(),
-                invoice.getTotalTax(),
-                invoice.getGrandTotal(),
+                subTotal,
+                totalDiscount,
+                totalTax,
+                grandTotal,
                 items
         );
     }
@@ -254,7 +261,7 @@ public class InvoiceService {
         }
 
         List<InvoiceReportDetail.ReportItem> lineItems =
-                invoice.getItems().stream().map(i -> new InvoiceReportDetail.ReportItem(
+                (invoice.getItems() != null ? invoice.getItems() : Collections.<InvoiceItem>emptyList()).stream().map(i -> new InvoiceReportDetail.ReportItem(
                         i.getProduct().getName(),
                         i.getProduct().getSku(),
                         i.getQuantitySold(),
@@ -262,6 +269,15 @@ public class InvoiceService {
                         i.getLineTotal(),
                         i.getItemDiscount()
                 )).toList();
+
+        BigDecimal subTotal = invoice.getSubTotal() != null ? invoice.getSubTotal() : BigDecimal.ZERO;
+        BigDecimal totalTax = invoice.getTotalTax() != null ? invoice.getTotalTax() : BigDecimal.ZERO;
+
+        BigDecimal taxRatePercent = BigDecimal.ZERO;
+        if (subTotal.compareTo(BigDecimal.ZERO) > 0) {
+            taxRatePercent = totalTax.divide(subTotal, 4, RoundingMode.HALF_UP)
+                    .multiply(BigDecimal.valueOf(100));
+        }
 
         return new InvoiceReportDetail(
                 invoice.getId(),
@@ -279,14 +295,12 @@ public class InvoiceService {
 
                 lineItems,
 
-                invoice.getSubTotal(),
+                subTotal,
                 invoice.getTotalDiscount(),
-                invoice.getTotalTax(),
+                totalTax,
                 invoice.getGrandTotal(),
 
-                invoice.getTotalTax()
-                        .divide(invoice.getSubTotal(), 4, RoundingMode.HALF_UP)
-                        .multiply(BigDecimal.valueOf(100))   // <-- taxRatePercent
+                taxRatePercent
         );
 
     }
