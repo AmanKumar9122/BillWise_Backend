@@ -40,7 +40,7 @@ public class User {
     // increased over time to counteract advances in hardware capabilities.
 
     // Eager fetching to load roles along with user
-    @ManyToMany(fetch = FetchType.EAGER,cascade = CascadeType.ALL)
+    @ManyToMany(fetch = FetchType.EAGER)
     // Why here we are using many to many ?
     // because one user can have multiple roles and one role can be assigned to multiple users
 
