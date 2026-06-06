@@ -153,6 +153,7 @@ public class InvoiceService {
     // -------------------------------------------------------------
     // ⭐ GET SINGLE INVOICE
     // -------------------------------------------------------------
+    @Transactional(readOnly = true)
     public InvoiceResponse getInvoiceById(Long id) {
 
         Invoice invoice = invoiceRepository.findById(id)
@@ -166,6 +167,7 @@ public class InvoiceService {
     // -------------------------------------------------------------
     // ⭐ FILTERED + PAGINATED INVOICE LIST
     // -------------------------------------------------------------
+    @Transactional(readOnly = true)
     public Page<InvoiceResponse> getInvoices(
             InvoiceFilterRequest filter,
             int page,
@@ -188,13 +190,10 @@ public class InvoiceService {
         LocalDateTime endDate = filter.endDate() != null ?
                 filter.endDate().atTime(23, 59, 59) : null;
 
-        // Custom repository method
-        Page<Invoice> invoices = invoiceRepository.searchInvoices(
-                filter.customerName(),
-                startDate,
-                endDate,
-                pageable
-        );
+        boolean hasFilters = filter.customerName() != null || startDate != null || endDate != null;
+        Page<Invoice> invoices = hasFilters
+                ? invoiceRepository.searchInvoices(filter.customerName(), startDate, endDate, pageable)
+                : invoiceRepository.findAll(pageable);
 
         return invoices.map(this::mapToInvoiceResponse);
     }
@@ -242,6 +241,7 @@ public class InvoiceService {
         );
     }
 
+    @Transactional(readOnly = true)
     public InvoiceReportDetail getPrintableInvoice(Long invoiceId) {
 
         Invoice invoice = invoiceRepository.findById(invoiceId)
@@ -295,16 +295,16 @@ public class InvoiceService {
 
                 lineItems,
 
+                taxRatePercent,
                 subTotal,
-                invoice.getTotalDiscount(),
+                invoice.getTotalDiscount() != null ? invoice.getTotalDiscount() : BigDecimal.ZERO,
                 totalTax,
-                invoice.getGrandTotal(),
-
-                taxRatePercent
+                invoice.getGrandTotal() != null ? invoice.getGrandTotal() : BigDecimal.ZERO
         );
 
     }
 
+    @Transactional(readOnly = true)
     public byte[] generateInvoicePdf(Long id) {
         InvoiceReportDetail report = getPrintableInvoice(id);
         return invoicePdfService.generatePdf(report);

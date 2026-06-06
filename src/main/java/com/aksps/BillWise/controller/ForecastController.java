@@ -20,15 +20,15 @@ public class ForecastController {
     }
 
     /**
-     * GET /api/forecast/{skuId}?days=30
+     * GET /api/forecast/{skuId}?months=3
      * Returns ML forecast for the given SKU.
      */
     @GetMapping("/{skuId}")
     public ResponseEntity<ForecastResponse> getForecast(
             @PathVariable Long skuId,
-            @RequestParam(defaultValue = "30") int days
+            @RequestParam(defaultValue = "3") int months
     ) {
-        ForecastResponse response = forecastService.getForecast(skuId, days);
+        ForecastResponse response = forecastService.getForecast(skuId, months);
         return ResponseEntity.ok(response);
     }
 

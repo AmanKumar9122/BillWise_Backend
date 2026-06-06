@@ -37,6 +37,7 @@ public interface ProductRepository extends JpaRepository<Product, Long> {
                i.product.sku AS sku,
                i.product.unitType AS unitType,
                i.product.currentStock AS currentStock,
+               SUM(i.quantitySold) AS unitsSold,
                SUM(i.lineTotal) AS totalRevenue
         FROM InvoiceItem i
         WHERE i.invoice.invoiceDate >= :startDate

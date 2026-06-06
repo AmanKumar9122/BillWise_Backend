@@ -1,5 +1,8 @@
 HELP.md
+src/main/resources/application.properties
 .env
+*.log
+data/
 .gradle
 build/
 !gradle/wrapper/gradle-wrapper.jar

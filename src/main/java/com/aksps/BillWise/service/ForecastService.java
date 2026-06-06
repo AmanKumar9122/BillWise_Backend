@@ -26,7 +26,7 @@ public class ForecastService {
 
         // Call ML service via MlIntegrationService which returns a reactive Mono<PredictionResponse>
         try {
-            Mono<PredictionResponse> mono = mlIntegrationService.getSalesPrediction(productId);
+            Mono<PredictionResponse> mono = mlIntegrationService.getSalesPrediction(productId, months);
             PredictionResponse pred = mono.block(Duration.ofSeconds(6)); // small blocking window
 
             ForecastResponse response = mlAdapter.toForecastResponse(pred, months);

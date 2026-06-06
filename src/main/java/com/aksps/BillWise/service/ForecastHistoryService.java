@@ -15,10 +15,11 @@ import java.util.List;
 public class ForecastHistoryService {
 
     private final ForecastHistoryRepository repo;
-    private final ObjectMapper objectMapper = new ObjectMapper();
+    private final ObjectMapper objectMapper;
 
-    public ForecastHistoryService(ForecastHistoryRepository repo) {
+    public ForecastHistoryService(ForecastHistoryRepository repo, ObjectMapper objectMapper) {
         this.repo = repo;
+        this.objectMapper = objectMapper;
     }
 
     public void saveForecast(Long productId, int months, ForecastResponse response) {

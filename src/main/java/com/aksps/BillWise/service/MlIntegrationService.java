@@ -43,9 +43,9 @@ public class MlIntegrationService {
      * @return A Mono that will emit the structured PredictionResponse.
      */
     @CircuitBreaker(name = ML_SERVICE_CB, fallbackMethod = "salesPredictionFallback")
-    public Mono<PredictionResponse> getSalesPrediction(Long productId) {
+    public Mono<PredictionResponse> getSalesPrediction(Long productId, int months) {
         // Call the ML service endpoint (relative to base URL set above)
-        String url = "/forecast?product_id=" + productId;
+        String url = "/forecast?product_id=" + productId + "&months=" + months;
 
         return webClient.get()
                 .uri(url)
@@ -53,17 +53,17 @@ public class MlIntegrationService {
                 .bodyToMono(PredictionResponse.class)
                 .timeout(Duration.ofSeconds(5))
                 // if an error happens before circuit breaker triggers, route to fallback as well
-                .onErrorResume(throwable -> salesPredictionFallback(productId, throwable));
+                .onErrorResume(throwable -> salesPredictionFallback(productId, months, throwable));
     }
 
     /**
      * Fallback method for the getSalesPrediction Circuit Breaker.
      * Returns last persisted forecast from ForecastHistoryService if available.
      */
-    public Mono<PredictionResponse> salesPredictionFallback(Long productId, Throwable t) {
+    public Mono<PredictionResponse> salesPredictionFallback(Long productId, int months, Throwable t) {
         System.err.println("ML Integration Service is DOWN or TIMED OUT for product " + productId + ". Reason: " + (t == null ? "unknown" : t.getMessage()));
 
-        ForecastResponse last = historyService.getLatestForecastForProduct(productId, 1);
+        ForecastResponse last = historyService.getLatestForecastForProduct(productId, months);
         if (last != null && last.getDailyPredictions() != null && !last.getDailyPredictions().isEmpty()) {
             // Map ForecastResponse -> PredictionResponse
             List<PredictionResponse.DailyPrediction> daily = new ArrayList<>();

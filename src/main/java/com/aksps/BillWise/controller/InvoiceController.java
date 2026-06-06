@@ -36,7 +36,7 @@ public class InvoiceController {
      * Create new invoice (core billing action)
      */
     @PostMapping
-    @PreAuthorize("hasAnyRole('ADMIN', 'MANAGER')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'MANAGER', 'USER')")
     public ResponseEntity<?> createInvoice(@Valid @RequestBody InvoiceRequest invoiceRequest) {
         try {
             InvoiceResponse processed = invoiceService.createInvoice(invoiceRequest);
@@ -55,7 +55,7 @@ public class InvoiceController {
      * Get a single invoice (view/print/audit)
      */
     @GetMapping("/{id}")
-    @PreAuthorize("hasAnyRole('ADMIN', 'MANAGER')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'MANAGER', 'USER')")
     public ResponseEntity<?> getInvoiceById(@PathVariable Long id) {
         try {
             InvoiceResponse invoice = invoiceService.getInvoiceById(id);
@@ -77,7 +77,7 @@ public class InvoiceController {
      *  - sorting (invoiceDate, grandTotal, etc.)
      */
     @GetMapping
-    @PreAuthorize("hasAnyRole('ADMIN','MANAGER')")
+    @PreAuthorize("hasAnyRole('ADMIN','MANAGER','USER')")
     public ResponseEntity<Page<InvoiceResponse>> listInvoices(
             @ModelAttribute InvoiceFilterRequest filter,
             @RequestParam(defaultValue = "0") int page,

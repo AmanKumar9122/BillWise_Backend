@@ -9,5 +9,6 @@ public interface TopProductProjection {
     String getSku();
     String getUnitType();
     Integer getCurrentStock();
+    Long getUnitsSold();
     BigDecimal getTotalRevenue();
 }

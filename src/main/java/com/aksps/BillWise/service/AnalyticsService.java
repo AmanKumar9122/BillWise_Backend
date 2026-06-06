@@ -49,7 +49,7 @@ public class AnalyticsService {
      * Calls ML microservice asynchronously to predict demand.
      */
     public Mono<PredictionResponse> getPredictedSales(Long productId) {
-        return mlIntegrationService.getSalesPrediction(productId);
+        return mlIntegrationService.getSalesPrediction(productId, 3);
     }
 
     /**
@@ -68,6 +68,7 @@ public class AnalyticsService {
                 p.getSku(),
                 p.getUnitType(),
                 p.getCurrentStock(),
+                p.getUnitsSold(),
                 p.getTotalRevenue()
         ));
     }

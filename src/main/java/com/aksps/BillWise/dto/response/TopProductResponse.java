@@ -11,6 +11,7 @@ public record TopProductResponse(
         String sku,
         String unitType,
         Integer currentStock,
+        Long unitsSold,
         // The metric used for ranking (e.g., total revenue or total units sold)
         BigDecimal performanceMetric
 ) {}

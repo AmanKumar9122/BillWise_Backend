@@ -105,7 +105,7 @@ public class SecurityConfig {
                         // Admin + Manager protected zones
                         .requestMatchers("/api/admin/**").hasAnyRole("ADMIN", "MANAGER")
                         .requestMatchers("/api/analytics/**").hasAnyRole("ADMIN", "MANAGER")
-                        .requestMatchers("/api/invoices/**").hasAnyRole("ADMIN", "MANAGER")
+                        .requestMatchers("/api/invoices/**").authenticated()
 
 
 

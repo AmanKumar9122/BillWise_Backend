@@ -1,5 +1,6 @@
 package com.aksps.BillWise.dto.ml;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
@@ -10,10 +11,10 @@ import java.util.List;
  */
 public record PredictionResponse(
         Long productId,
-        LocalDate predictionDate,
-        String timeHorizon, // e.g., "30 days"
-        BigDecimal predictedTotalSales, // The sum total predicted sales value
-        List<DailyPrediction> dailyForecast
+        @JsonProperty("generatedAt") LocalDate predictionDate,
+        @JsonProperty("forecastingWindow") String timeHorizon,
+        @JsonProperty("predictedTotalRevenue") BigDecimal predictedTotalSales,
+        @JsonProperty("dailyPredictions") List<DailyPrediction> dailyForecast
 ) {
     /**
      * Inner record for detailed daily forecast data.
